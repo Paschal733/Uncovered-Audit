@@ -1,19 +1,4 @@
 
-# =============================================================================
-# UNCOVERED ORDERS AUDIT — STREAMLIT WEB APP
-# Amazon Freight Scheduling Team
-# =============================================================================
-# HOW TO DEPLOY (Streamlit Community Cloud — free):
-#   1. Create a free account at streamlit.io
-#   2. Push this file to a GitHub repository
-#   3. Go to share.streamlit.io -> "New app" -> select your repo and this file
-#   4. Click Deploy
-#
-# HOW TO RUN LOCALLY:
-#   1. pip install streamlit pandas openpyxl
-#   2. streamlit run uncovered_audit_app.py
-# =============================================================================
-
 import streamlit as st
 import pandas as pd
 import re
@@ -43,8 +28,8 @@ CST_SHIPPERS = [
     "Keter Italia S.p.A.", "Keter Iberia S.L.U", "Keter Germany Gmbh", "Keter France Sas",
     "Mars PF France", "Mars GmbH (CBT-DE)", "Mars Multisales Spain S.L.",
     "Mars Food Europe CV", "Mars GmbH FLOERSHEIM", "Mars GmbH MINDEN",
-    "Messaggerie Libri Spa", "Mömax Logistik GmbH", "Mondi Logistik GmbH",
-    "Nestlé Enterprises SA, Business Growth Solutions Division", "Nestlé UK",
+    "Messaggerie Libri Spa", "Moemax Logistik GmbH", "Mondi Logistik GmbH",
+    "Nestle Enterprises SA, Business Growth Solutions Division", "Nestle UK",
     "Nestrade S.A. T-Hub Central", "Nestrade SA (t-hub North)",
     "Nestrade S.A. T-Hub North", "Nestrade S.A. T-Hub South",
     "Nestrade SA", "Nestrade SA (Worms)", "Nestrade T-hub West",
@@ -63,7 +48,7 @@ CST_SHIPPERS = [
     "Yankee Candle Co - DE", "Zalando SE", "Zeitfracht Medien GmbH",
     "Danone Deutschland GmbH", "Danone UK Waters", "Danone FR", "Tchibo GmbH",
     "Hachette UK Distribution", "Wacker Chemie AG",
-    "Electrolux Hausgeräte GmbH", "Sharp Consumer Electronics Poland sp. z o.o.",
+    "Electrolux Hausgeraete GmbH", "Sharp Consumer Electronics Poland sp. z o.o.",
     "Brita France", "BRITA SE - Shipments Beselich",
     "Brita Italia s.r.l. Unipersonale", "home24 eLogistics GmbH & Co. KG",
     "Cargill Poland Sp. z o.o.", "Nitto Advanced Film Gronau GmbH",
@@ -179,7 +164,7 @@ for key, val in defaults.items():
 # =============================================================================
 
 st.title("Uncovered Orders Audit")
-st.caption("Amazon Freight Scheduling Team — Automated Audit Workflow")
+st.caption("Amazon Freight Scheduling Team - Automated Audit Workflow")
 st.divider()
 
 step_labels = [
@@ -196,11 +181,11 @@ st.progress(
 st.divider()
 
 # =============================================================================
-# STEP 1 — LOAD FILE
+# STEP 1 - LOAD FILE
 # =============================================================================
 
 if st.session_state.step == 1:
-    st.header("Step 1 — Upload SMC Export File")
+    st.header("Step 1 - Upload SMC Export File")
     st.info(
         "Download the uncovered orders file from SMC TMS "
         "(untick LTL, export), then upload it here to begin the audit."
@@ -219,18 +204,18 @@ if st.session_state.step == 1:
             )
             st.dataframe(df.head(10), use_container_width=True)
             st.caption("Showing first 10 of {} rows.".format(len(df)))
-            if st.button("Proceed to Step 2 — Data Cleanup", type="primary"):
+            if st.button("Proceed to Step 2 - Data Cleanup", type="primary"):
                 st.session_state.step = 2
                 st.rerun()
         except Exception as e:
             st.error("Error reading file: {}. Please check the file and try again.".format(e))
 
 # =============================================================================
-# STEP 2 — CLEANUP
+# STEP 2 - CLEANUP
 # =============================================================================
 
 elif st.session_state.step == 2:
-    st.header("Step 2 — Data Cleanup")
+    st.header("Step 2 - Data Cleanup")
     st.info(
         "Removing: test orders (Shipper contains 'Test'), "
         "orders outside the current year, and orders created more than 2 months ago."
@@ -273,19 +258,19 @@ elif st.session_state.step == 2:
             st.session_state.step = 1
             st.rerun()
     with col2:
-        if st.button("Proceed to Step 3 — Classify Orders", type="primary"):
+        if st.button("Proceed to Step 3 - Classify Orders", type="primary"):
             st.session_state.df_clean = df
             st.session_state.step = 3
             st.rerun()
 
 # =============================================================================
-# STEP 3 — FORMAT AND CLASSIFY
+# STEP 3 - FORMAT AND CLASSIFY
 # =============================================================================
 
 elif st.session_state.step == 3:
-    st.header("Step 3 — Format Report & Classify Orders")
+    st.header("Step 3 - Format Report and Classify Orders")
     st.info(
-        "Renaming Column B to 'Source', keeping only the 7 required columns, "
+        "Renaming Column B to Source, keeping only the 7 required columns, "
         "and classifying each order as SMC (Amazon alias) or R4S (all others)."
     )
     df = st.session_state.df_clean.copy()
@@ -293,7 +278,7 @@ elif st.session_state.step == 3:
     if len(columns) >= 2:
         old_name = columns[1]
         df = df.rename(columns={old_name: "Source"})
-        st.markdown("Renamed column '{}' to 'Source'".format(old_name))
+        st.markdown("Renamed column {} to Source".format(old_name))
 
     col_map = {col.strip().lower(): col for col in df.columns}
     missing = [c for c in REQUIRED_COLUMNS if c.lower() not in col_map]
@@ -321,17 +306,17 @@ elif st.session_state.step == 3:
             st.session_state.step = 2
             st.rerun()
     with col2:
-        if st.button("Proceed to Step 4 — External Deliveries", type="primary"):
+        if st.button("Proceed to Step 4 - External Deliveries", type="primary"):
             st.session_state.df_formatted = df
             st.session_state.step = 4
             st.rerun()
 
 # =============================================================================
-# STEP 4 — EXTERNAL DELIVERIES
+# STEP 4 - EXTERNAL DELIVERIES
 # =============================================================================
 
 elif st.session_state.step == 4:
-    st.header("Step 4 — Process External Deliveries")
+    st.header("Step 4 - Process External Deliveries")
     df = st.session_state.df_formatted.copy()
     col_map      = {col.strip().lower(): col for col in df.columns}
     facility_col = col_map.get("destination stop facility name")
@@ -372,21 +357,25 @@ elif st.session_state.step == 4:
     )
 
     st.divider()
-    st.subheader("CST External Orders — copy to CST Task Sheet (Uncovered tab)")
+    st.subheader("CST External Orders - copy to CST Task Sheet (Uncovered tab)")
     st.dataframe(cst_ext, use_container_width=True)
 
-    st.subheader("Non-CST External Orders — copy to AF Scheduling Daily Task Workbook (Uncovered tab)")
+    st.subheader("Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)")
     st.dataframe(non_cst_ext, use_container_width=True)
 
     st.divider()
     st.warning(
-        """ACTION REQUIRED
+        "ACTION REQUIRED
 
-1. Download the file above.
-2. Copy 'CST External Orders' sheet to the CST Task Sheet (Uncovered tab).
-3. Copy 'Non-CST External Orders' sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
+"
+        "1. Download the file above.
+"
+        "2. Copy CST External Orders sheet to the CST Task Sheet (Uncovered tab).
+"
+        "3. Copy Non-CST External Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
 
-Click 'Done' below once you have completed this step."""
+"
+        "Click Done below once you have completed this step."
     )
 
     col1, col2 = st.columns(2)
@@ -395,7 +384,7 @@ Click 'Done' below once you have completed this step."""
             st.session_state.step = 3
             st.rerun()
     with col2:
-        if st.button("Done — Proceed to Step 5", type="primary"):
+        if st.button("Done - Proceed to Step 5", type="primary"):
             st.session_state.cst_ext     = cst_ext
             st.session_state.non_cst_ext = non_cst_ext
             st.session_state.df_step5    = internal_df.drop(columns=["_is_fc"])
@@ -403,11 +392,11 @@ Click 'Done' below once you have completed this step."""
             st.rerun()
 
 # =============================================================================
-# STEP 5 — UNIFIED PORTAL ISA CHECK
+# STEP 5 - UNIFIED PORTAL ISA CHECK
 # =============================================================================
 
 elif st.session_state.step == 5:
-    st.header("Step 5 — Unified Portal ISA Check")
+    st.header("Step 5 - Unified Portal ISA Check")
     df_step5     = st.session_state.df_step5
     col_map      = {col.strip().lower(): col for col in df_step5.columns}
     order_id_col = col_map.get("order id")
@@ -430,12 +419,17 @@ elif st.session_state.step == 5:
     st.divider()
     st.subheader("Unified Portal Instructions")
     st.markdown(
-        """1. Download the file above (or copy the IDs from the panel above).
-2. Go to the Unified Portal and set ID type to **progressive number**.
-3. Paste the IDs in batches of 50 and click **Submit**.
-4. Filter results where **appointmentStatus = arrival scheduled**.
-5. Note the matching Order IDs.
-6. Come back here and enter the results below."""
+        "1. Download the file above (or copy the IDs from the panel above).
+"
+        "2. Go to the Unified Portal and set ID type to **progressive number**.
+"
+        "3. Paste the IDs in batches of 50 and click **Submit**.
+"
+        "4. Filter results where **appointmentStatus = arrival scheduled**.
+"
+        "5. Note the matching Order IDs.
+"
+        "6. Come back here and enter the results below."
     )
 
     st.divider()
@@ -512,11 +506,11 @@ elif st.session_state.step == 5:
             st.rerun()
 
 # =============================================================================
-# STEP 6 — FINAL RESULTS
+# STEP 6 - FINAL RESULTS
 # =============================================================================
 
 elif st.session_state.step == 6:
-    st.header("Audit Complete — Final Results")
+    st.header("Audit Complete - Final Results")
     st.balloons()
 
     cst_final       = st.session_state["cst_final"]
@@ -548,21 +542,25 @@ elif st.session_state.step == 6:
     )
 
     st.divider()
-    st.subheader("CST Orders — copy to CST Task Sheet (Uncovered tab)")
+    st.subheader("CST Orders - copy to CST Task Sheet (Uncovered tab)")
     st.dataframe(cst_final, use_container_width=True)
 
-    st.subheader("Non-CST Orders — copy to AF Scheduling Daily Task Workbook (Uncovered tab)")
+    st.subheader("Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)")
     st.dataframe(non_cst_final, use_container_width=True)
 
     st.divider()
     st.warning(
-        """FINAL ACTION REQUIRED
+        "FINAL ACTION REQUIRED
 
-1. Download the file above.
-2. Copy 'CST Orders' sheet to the CST Task Sheet (Uncovered tab).
-3. Copy 'Non-CST Orders' sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
+"
+        "1. Download the file above.
+"
+        "2. Copy CST Orders sheet to the CST Task Sheet (Uncovered tab).
+"
+        "3. Copy Non-CST Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
 
-Audit complete!"""
+"
+        "Audit complete!"
     )
 
     st.divider()
