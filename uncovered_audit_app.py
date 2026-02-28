@@ -1,4 +1,6 @@
 
+
+ 
 import streamlit as st
 import pandas as pd
 import re
@@ -78,6 +80,7 @@ _STOPWORDS = {
     "sas", "sl", "nv", "ag", "plc", "ug", "bvba", "srl", "spzoo",
 }
 
+
 def _normalise(s):
     if not isinstance(s, str):
         return ""
@@ -85,13 +88,16 @@ def _normalise(s):
     s = re.sub(r"\s+", " ", s)
     return s.strip().lower()
 
+
 def _core_tokens(s):
     words = re.sub(r"[^\w\s]", " ", s).lower().split()
     return frozenset(w for w in words if len(w) > 2 and w not in _STOPWORDS)
 
-_CST_EXACT  = set(s.strip().lower() for s in CST_SHIPPERS)
-_CST_FUZZY  = set(_normalise(s) for s in CST_SHIPPERS)
+
+_CST_EXACT = set(s.strip().lower() for s in CST_SHIPPERS)
+_CST_FUZZY = set(_normalise(s) for s in CST_SHIPPERS)
 _CST_TOKENS = [_core_tokens(s) for s in CST_SHIPPERS]
+
 
 def is_cst_shipper(name):
     if not isinstance(name, str) or not name.strip():
@@ -111,6 +117,7 @@ def is_cst_shipper(name):
             return True
     return False
 
+
 AMAZON_ALIAS_PATTERN = re.compile(r"^[a-z]{5,8}$")
 FC_PATTERN = re.compile(r"^[A-Z]{3}\d{1,2}$")
 
@@ -120,15 +127,18 @@ REQUIRED_COLUMNS = [
     "Creation Date and Time", "Created by",
 ]
 
+
 def is_fc_facility(name):
     if not isinstance(name, str):
         return False
     return bool(FC_PATTERN.match(name.strip()))
 
+
 def classify_source(created_by):
     if not isinstance(created_by, str):
         return "R4S"
     return "SMC" if AMAZON_ALIAS_PATTERN.match(created_by.strip()) else "R4S"
+
 
 def load_smc_file(uploaded_file):
     raw = uploaded_file.read()
@@ -139,12 +149,14 @@ def load_smc_file(uploaded_file):
         return df
     return pd.read_excel(io.BytesIO(raw), dtype=str, engine="openpyxl")
 
+
 def to_excel_bytes(sheets):
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         for sheet_name, df in sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
     return buf.getvalue()
+
 
 # =============================================================================
 # SESSION STATE
@@ -217,14 +229,14 @@ if st.session_state.step == 1:
 elif st.session_state.step == 2:
     st.header("Step 2 - Data Cleanup")
     st.info(
-        "Removing: test orders (Shipper contains 'Test'), "
+        "Removing: test orders (Shipper contains Test), "
         "orders outside the current year, and orders created more than 2 months ago."
     )
     df = st.session_state.df_raw.copy()
     initial_count = len(df)
     log = []
     col_map = {col.strip().lower(): col for col in df.columns}
-    shipper_col  = col_map.get("shipper")
+    shipper_col = col_map.get("shipper")
     creation_col = col_map.get("creation date and time")
 
     if shipper_col:
@@ -234,7 +246,7 @@ elif st.session_state.step == 2:
 
     if creation_col:
         df[creation_col] = pd.to_datetime(df[creation_col], errors="coerce", dayfirst=False)
-        current_year   = datetime.now().year
+        current_year = datetime.now().year
         two_months_ago = datetime.now() - timedelta(days=60)
         before = len(df)
         df = df[
@@ -318,13 +330,13 @@ elif st.session_state.step == 3:
 elif st.session_state.step == 4:
     st.header("Step 4 - Process External Deliveries")
     df = st.session_state.df_formatted.copy()
-    col_map      = {col.strip().lower(): col for col in df.columns}
+    col_map = {col.strip().lower(): col for col in df.columns}
     facility_col = col_map.get("destination stop facility name")
-    shipper_col  = col_map.get("shipper")
+    shipper_col = col_map.get("shipper")
 
-    df["_is_fc"]  = df[facility_col].apply(is_fc_facility)
-    external_df   = df[df["_is_fc"] == False].copy()
-    internal_df   = df[df["_is_fc"] == True].copy()
+    df["_is_fc"] = df[facility_col].apply(is_fc_facility)
+    external_df = df[df["_is_fc"] == False].copy()
+    internal_df = df[df["_is_fc"] == True].copy()
 
     c1, c2 = st.columns(2)
     c1.metric("Internal (FC-bound) Orders", len(internal_df))
@@ -332,10 +344,10 @@ elif st.session_state.step == 4:
 
     if not external_df.empty and shipper_col:
         external_df["_is_cst"] = external_df[shipper_col].apply(is_cst_shipper)
-        cst_ext     = external_df[external_df["_is_cst"] == True].drop(columns=["_is_fc", "_is_cst"])
+        cst_ext = external_df[external_df["_is_cst"] == True].drop(columns=["_is_fc", "_is_cst"])
         non_cst_ext = external_df[external_df["_is_cst"] == False].drop(columns=["_is_fc", "_is_cst"])
     else:
-        cst_ext     = pd.DataFrame(columns=REQUIRED_COLUMNS)
+        cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
         non_cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
 
     c1, c2 = st.columns(2)
@@ -364,7 +376,7 @@ elif st.session_state.step == 4:
     st.dataframe(non_cst_ext, use_container_width=True)
 
     st.divider()
-    st.warning(
+    action_msg = (
         "ACTION REQUIRED
 
 "
@@ -377,6 +389,7 @@ elif st.session_state.step == 4:
 "
         "Click Done below once you have completed this step."
     )
+    st.warning(action_msg)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -385,10 +398,10 @@ elif st.session_state.step == 4:
             st.rerun()
     with col2:
         if st.button("Done - Proceed to Step 5", type="primary"):
-            st.session_state.cst_ext     = cst_ext
+            st.session_state.cst_ext = cst_ext
             st.session_state.non_cst_ext = non_cst_ext
-            st.session_state.df_step5    = internal_df.drop(columns=["_is_fc"])
-            st.session_state.step        = 5
+            st.session_state.df_step5 = internal_df.drop(columns=["_is_fc"])
+            st.session_state.step = 5
             st.rerun()
 
 # =============================================================================
@@ -397,8 +410,8 @@ elif st.session_state.step == 4:
 
 elif st.session_state.step == 5:
     st.header("Step 5 - Unified Portal ISA Check")
-    df_step5     = st.session_state.df_step5
-    col_map      = {col.strip().lower(): col for col in df_step5.columns}
+    df_step5 = st.session_state.df_step5
+    col_map = {col.strip().lower(): col for col in df_step5.columns}
     order_id_col = col_map.get("order id")
 
     remaining_ids = df_step5[order_id_col].dropna().astype(str).str.strip().tolist()
@@ -413,12 +426,13 @@ elif st.session_state.step == 5:
     )
 
     with st.expander("View / Copy Order IDs (copy-paste into Unified Portal)"):
-        st.code("
-".join(remaining_ids), language=None)
+        ids_text = "
+".join(remaining_ids)
+        st.code(ids_text, language=None)
 
     st.divider()
     st.subheader("Unified Portal Instructions")
-    st.markdown(
+    portal_instructions = (
         "1. Download the file above (or copy the IDs from the panel above).
 "
         "2. Go to the Unified Portal and set ID type to **progressive number**.
@@ -431,6 +445,7 @@ elif st.session_state.step == 5:
 "
         "6. Come back here and enter the results below."
     )
+    st.markdown(portal_instructions)
 
     st.divider()
     st.subheader("Enter Unified Portal Results")
@@ -486,21 +501,21 @@ elif st.session_state.step == 5:
             portal_ids_set = set(portal_ids)
             df_step5 = st.session_state.df_step5.copy()
             df_step5["_in_portal"] = df_step5[order_id_col].astype(str).str.strip().isin(portal_ids_set)
-            matched_df      = df_step5[df_step5["_in_portal"] == True].drop(columns=["_in_portal"])
+            matched_df = df_step5[df_step5["_in_portal"] == True].drop(columns=["_in_portal"])
             unmatched_count = int((df_step5["_in_portal"] == False).sum())
 
             shipper_col = col_map.get("shipper")
             if shipper_col and not matched_df.empty:
                 matched_df = matched_df.copy()
                 matched_df["_is_cst"] = matched_df[shipper_col].apply(is_cst_shipper)
-                cst_final     = matched_df[matched_df["_is_cst"] == True].drop(columns=["_is_cst"])
+                cst_final = matched_df[matched_df["_is_cst"] == True].drop(columns=["_is_cst"])
                 non_cst_final = matched_df[matched_df["_is_cst"] == False].drop(columns=["_is_cst"])
             else:
-                cst_final     = pd.DataFrame(columns=REQUIRED_COLUMNS)
+                cst_final = pd.DataFrame(columns=REQUIRED_COLUMNS)
                 non_cst_final = matched_df if not matched_df.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)
 
-            st.session_state["cst_final"]       = cst_final
-            st.session_state["non_cst_final"]   = non_cst_final
+            st.session_state["cst_final"] = cst_final
+            st.session_state["non_cst_final"] = non_cst_final
             st.session_state["unmatched_count"] = unmatched_count
             st.session_state.step = 6
             st.rerun()
@@ -513,8 +528,8 @@ elif st.session_state.step == 6:
     st.header("Audit Complete - Final Results")
     st.balloons()
 
-    cst_final       = st.session_state["cst_final"]
-    non_cst_final   = st.session_state["non_cst_final"]
+    cst_final = st.session_state["cst_final"]
+    non_cst_final = st.session_state["non_cst_final"]
     unmatched_count = st.session_state["unmatched_count"]
 
     c1, c2, c3 = st.columns(3)
@@ -549,7 +564,7 @@ elif st.session_state.step == 6:
     st.dataframe(non_cst_final, use_container_width=True)
 
     st.divider()
-    st.warning(
+    final_msg = (
         "FINAL ACTION REQUIRED
 
 "
@@ -562,10 +577,12 @@ elif st.session_state.step == 6:
 "
         "Audit complete!"
     )
+    st.warning(final_msg)
 
     st.divider()
     if st.button("Start a New Audit", type="primary"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
+
 
