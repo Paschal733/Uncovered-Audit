@@ -5,11 +5,11 @@
 # =============================================================================
 # HOW TO DEPLOY (Streamlit Community Cloud — free):
 #   1. Create a free account at streamlit.io
-#   2. Push this file to a GitHub repository (public or private)
+#   2. Push this file to a GitHub repository
 #   3. Go to share.streamlit.io -> "New app" -> select your repo and this file
-#   4. Click Deploy — your app will be live at a permanent URL
+#   4. Click Deploy
 #
-# HOW TO RUN LOCALLY (for testing):
+# HOW TO RUN LOCALLY:
 #   1. pip install streamlit pandas openpyxl
 #   2. streamlit run uncovered_audit_app.py
 # =============================================================================
@@ -20,15 +20,7 @@ import re
 import io
 from datetime import datetime, timedelta
 
-# =============================================================================
-# PAGE CONFIG
-# =============================================================================
-
-st.set_page_config(
-    page_title="Uncovered Orders Audit",
-    page_icon="🚛",
-    layout="wide",
-)
+st.set_page_config(page_title="Uncovered Orders Audit", page_icon="🚛", layout="wide")
 
 # =============================================================================
 # CST SHIPPER LIST
@@ -96,19 +88,20 @@ CST_SHIPPERS = [
 # =============================================================================
 
 _STOPWORDS = {
-    'the', 'and', 'for', 'von', 'van', 'de', 'di', 'du', 'der',
-    'gmbh', 'bv', 'sa', 'ltd', 'llc', 'inc', 'co', 'kg', 'spa',
-    'sas', 'sl', 'nv', 'ag', 'plc', 'ug', 'bvba', 'srl', 'spzoo',
+    "the", "and", "for", "von", "van", "de", "di", "du", "der",
+    "gmbh", "bv", "sa", "ltd", "llc", "inc", "co", "kg", "spa",
+    "sas", "sl", "nv", "ag", "plc", "ug", "bvba", "srl", "spzoo",
 }
 
 def _normalise(s):
-    if not isinstance(s, str): return ""
-    s = re.sub(r'[^\w\s]', '', s)
-    s = re.sub(r'\s+', ' ', s)
+    if not isinstance(s, str):
+        return ""
+    s = re.sub(r"[^\w\s]", "", s)
+    s = re.sub(r"\s+", " ", s)
     return s.strip().lower()
 
 def _core_tokens(s):
-    words = re.sub(r'[^\w\s]', ' ', s).lower().split()
+    words = re.sub(r"[^\w\s]", " ", s).lower().split()
     return frozenset(w for w in words if len(w) > 2 and w not in _STOPWORDS)
 
 _CST_EXACT  = set(s.strip().lower() for s in CST_SHIPPERS)
@@ -116,19 +109,25 @@ _CST_FUZZY  = set(_normalise(s) for s in CST_SHIPPERS)
 _CST_TOKENS = [_core_tokens(s) for s in CST_SHIPPERS]
 
 def is_cst_shipper(name):
-    if not isinstance(name, str) or not name.strip(): return False
-    if name.strip().lower() in _CST_EXACT: return True
-    if _normalise(name) in _CST_FUZZY: return True
+    if not isinstance(name, str) or not name.strip():
+        return False
+    if name.strip().lower() in _CST_EXACT:
+        return True
+    if _normalise(name) in _CST_FUZZY:
+        return True
     input_tokens = _core_tokens(name)
-    if len(input_tokens) < 2: return False
+    if len(input_tokens) < 2:
+        return False
     for cst_tokens in _CST_TOKENS:
-        if not cst_tokens: continue
+        if not cst_tokens:
+            continue
         overlap = len(input_tokens & cst_tokens)
-        if overlap >= 2 and overlap / len(input_tokens) >= 0.8: return True
+        if overlap >= 2 and overlap / len(input_tokens) >= 0.8:
+            return True
     return False
 
-AMAZON_ALIAS_PATTERN = re.compile(r'^[a-z]{5,8}$')
-FC_PATTERN = re.compile(r'^[A-Z]{3}\d{1,2}$')
+AMAZON_ALIAS_PATTERN = re.compile(r"^[a-z]{5,8}$")
+FC_PATTERN = re.compile(r"^[A-Z]{3}\d{1,2}$")
 
 REQUIRED_COLUMNS = [
     "Order ID", "Source", "Shipper",
@@ -137,48 +136,46 @@ REQUIRED_COLUMNS = [
 ]
 
 def is_fc_facility(name):
-    if not isinstance(name, str): return False
+    if not isinstance(name, str):
+        return False
     return bool(FC_PATTERN.match(name.strip()))
 
 def classify_source(created_by):
-    if not isinstance(created_by, str): return "R4S"
+    if not isinstance(created_by, str):
+        return "R4S"
     return "SMC" if AMAZON_ALIAS_PATTERN.match(created_by.strip()) else "R4S"
 
 def load_smc_file(uploaded_file):
     raw = uploaded_file.read()
-    if raw[:6] == b'Sheet0' or raw[:5] == b'Sheet':
-        df = pd.read_csv(io.BytesIO(raw), sep='\t', dtype=str, skiprows=1)
-        if 'Unnamed: 0' in df.columns:
-            df = df.drop(columns=['Unnamed: 0'])
+    if raw[:6] == b"Sheet0" or raw[:5] == b"Sheet":
+        df = pd.read_csv(io.BytesIO(raw), sep="\t", dtype=str, skiprows=1)
+        if "Unnamed: 0" in df.columns:
+            df = df.drop(columns=["Unnamed: 0"])
         return df
-    return pd.read_excel(io.BytesIO(raw), dtype=str, engine='openpyxl')
+    return pd.read_excel(io.BytesIO(raw), dtype=str, engine="openpyxl")
 
 def to_excel_bytes(sheets):
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         for sheet_name, df in sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
     return buf.getvalue()
 
 # =============================================================================
-# SESSION STATE INITIALISATION
+# SESSION STATE
 # =============================================================================
 
 defaults = {
-    "step": 1,
-    "df_raw": None,
-    "df_clean": None,
-    "df_formatted": None,
-    "df_step5": None,
-    "cst_ext": None,
-    "non_cst_ext": None,
+    "step": 1, "df_raw": None, "df_clean": None,
+    "df_formatted": None, "df_step5": None,
+    "cst_ext": None, "non_cst_ext": None,
 }
 for key, val in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = val
 
 # =============================================================================
-# APP HEADER
+# HEADER
 # =============================================================================
 
 st.title("Uncovered Orders Audit")
@@ -190,63 +187,68 @@ step_labels = [
     "4. External Orders", "5. Portal Check", "6. Final Results"
 ]
 progress_val = (st.session_state.step - 1) / (len(step_labels) - 1)
-st.progress(progress_val, text="Step {} of {}: {}".format(
-    st.session_state.step, len(step_labels), step_labels[st.session_state.step - 1]))
+st.progress(
+    progress_val,
+    text="Step {} of {}: {}".format(
+        st.session_state.step, len(step_labels), step_labels[st.session_state.step - 1]
+    )
+)
 st.divider()
 
 # =============================================================================
-# STEP 1 — LOAD SMC EXPORT FILE
+# STEP 1 — LOAD FILE
 # =============================================================================
 
 if st.session_state.step == 1:
     st.header("Step 1 — Upload SMC Export File")
-    st.info("Download the uncovered orders file from SMC TMS (untick LTL, export), then upload it here to begin the audit.")
-
+    st.info(
+        "Download the uncovered orders file from SMC TMS "
+        "(untick LTL, export), then upload it here to begin the audit."
+    )
     uploaded = st.file_uploader(
         "Upload your SMC uncovered orders export (.xlsx)",
         type=["xlsx", "xls", "csv"],
         key="smc_upload",
     )
-
     if uploaded is not None:
         try:
             df = load_smc_file(uploaded)
             st.session_state.df_raw = df
-            st.success("File loaded: {} orders, {} columns detected.".format(len(df), len(df.columns)))
+            st.success(
+                "File loaded: {} orders, {} columns detected.".format(len(df), len(df.columns))
+            )
             st.dataframe(df.head(10), use_container_width=True)
             st.caption("Showing first 10 of {} rows.".format(len(df)))
-
             if st.button("Proceed to Step 2 — Data Cleanup", type="primary"):
                 st.session_state.step = 2
                 st.rerun()
-
         except Exception as e:
             st.error("Error reading file: {}. Please check the file and try again.".format(e))
 
 # =============================================================================
-# STEP 2 — DATA CLEANUP
+# STEP 2 — CLEANUP
 # =============================================================================
 
 elif st.session_state.step == 2:
     st.header("Step 2 — Data Cleanup")
-    st.info("Removing: test orders (Shipper contains 'Test'), orders outside the current year, and orders created more than 2 months ago.")
-
+    st.info(
+        "Removing: test orders (Shipper contains 'Test'), "
+        "orders outside the current year, and orders created more than 2 months ago."
+    )
     df = st.session_state.df_raw.copy()
     initial_count = len(df)
     log = []
-
-    col_map      = {col.strip().lower(): col for col in df.columns}
+    col_map = {col.strip().lower(): col for col in df.columns}
     shipper_col  = col_map.get("shipper")
     creation_col = col_map.get("creation date and time")
 
     if shipper_col:
         before = len(df)
         df = df[~df[shipper_col].str.contains("test", case=False, na=False)]
-        removed = before - len(df)
-        log.append("Removed {} test order(s).".format(removed))
+        log.append("Removed {} test order(s).".format(before - len(df)))
 
     if creation_col:
-        df[creation_col] = pd.to_datetime(df[creation_col], errors='coerce', dayfirst=False)
+        df[creation_col] = pd.to_datetime(df[creation_col], errors="coerce", dayfirst=False)
         current_year   = datetime.now().year
         two_months_ago = datetime.now() - timedelta(days=60)
         before = len(df)
@@ -254,15 +256,15 @@ elif st.session_state.step == 2:
             (df[creation_col].dt.year == current_year) &
             (df[creation_col] >= two_months_ago)
         ]
-        removed = before - len(df)
-        log.append("Removed {} order(s) outside current year or older than 2 months.".format(removed))
+        log.append("Removed {} order(s) outside current year or older than 2 months.".format(before - len(df)))
 
-    log.append("Cleanup complete. {} orders removed. {} orders remaining.".format(
-        initial_count - len(df), len(df)))
-
+    log.append(
+        "Cleanup complete. {} orders removed. {} orders remaining.".format(
+            initial_count - len(df), len(df)
+        )
+    )
     for msg in log:
         st.markdown(msg)
-
     st.dataframe(df, use_container_width=True)
 
     col1, col2 = st.columns(2)
@@ -282,10 +284,11 @@ elif st.session_state.step == 2:
 
 elif st.session_state.step == 3:
     st.header("Step 3 — Format Report & Classify Orders")
-    st.info("Renaming Column B to 'Source', keeping only the 7 required columns, and classifying each order as SMC (Amazon alias) or R4S (all others).")
-
+    st.info(
+        "Renaming Column B to 'Source', keeping only the 7 required columns, "
+        "and classifying each order as SMC (Amazon alias) or R4S (all others)."
+    )
     df = st.session_state.df_clean.copy()
-
     columns = list(df.columns)
     if len(columns) >= 2:
         old_name = columns[1]
@@ -293,7 +296,6 @@ elif st.session_state.step == 3:
         st.markdown("Renamed column '{}' to 'Source'".format(old_name))
 
     col_map = {col.strip().lower(): col for col in df.columns}
-
     missing = [c for c in REQUIRED_COLUMNS if c.lower() not in col_map]
     if missing:
         st.warning("Missing required columns: {}".format(missing))
@@ -330,7 +332,6 @@ elif st.session_state.step == 3:
 
 elif st.session_state.step == 4:
     st.header("Step 4 — Process External Deliveries")
-
     df = st.session_state.df_formatted.copy()
     col_map      = {col.strip().lower(): col for col in df.columns}
     facility_col = col_map.get("destination stop facility name")
@@ -379,17 +380,13 @@ elif st.session_state.step == 4:
 
     st.divider()
     st.warning(
-        "ACTION REQUIRED
+        """ACTION REQUIRED
 
-"
-        "1. Download the file above.
-"
-        "2. Copy 'CST External Orders' sheet to the CST Task Sheet (Uncovered tab).
-"
-        "3. Copy 'Non-CST External Orders' sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
+1. Download the file above.
+2. Copy 'CST External Orders' sheet to the CST Task Sheet (Uncovered tab).
+3. Copy 'Non-CST External Orders' sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
 
-"
-        "Click 'Done' below once you have completed this step."
+Click 'Done' below once you have completed this step."""
     )
 
     col1, col2 = st.columns(2)
@@ -411,7 +408,6 @@ elif st.session_state.step == 4:
 
 elif st.session_state.step == 5:
     st.header("Step 5 — Unified Portal ISA Check")
-
     df_step5     = st.session_state.df_step5
     col_map      = {col.strip().lower(): col for col in df_step5.columns}
     order_id_col = col_map.get("order id")
@@ -434,17 +430,12 @@ elif st.session_state.step == 5:
     st.divider()
     st.subheader("Unified Portal Instructions")
     st.markdown(
-        "1. Download the file above (or copy the IDs from the panel above).
-"
-        "2. Go to the Unified Portal and set ID type to **progressive number**.
-"
-        "3. Paste the IDs in batches of 50 and click **Submit**.
-"
-        "4. Filter results where **appointmentStatus = arrival scheduled**.
-"
-        "5. Note the matching Order IDs.
-"
-        "6. Come back here and enter the results below."
+        """1. Download the file above (or copy the IDs from the panel above).
+2. Go to the Unified Portal and set ID type to **progressive number**.
+3. Paste the IDs in batches of 50 and click **Submit**.
+4. Filter results where **appointmentStatus = arrival scheduled**.
+5. Note the matching Order IDs.
+6. Come back here and enter the results below."""
     )
 
     st.divider()
@@ -471,7 +462,6 @@ elif st.session_state.step == 5:
             raw_ids = [line.strip() for line in pasted.strip().splitlines() if line.strip()]
             portal_ids = list(dict.fromkeys(raw_ids))
             st.success("{} unique Order IDs entered.".format(len(portal_ids)))
-
     else:
         portal_file = st.file_uploader(
             "Upload your Unified Portal results file (CSV or Excel, one Order ID per row, no header):",
@@ -484,7 +474,7 @@ elif st.session_state.step == 5:
                 if portal_file.name.lower().endswith(".csv"):
                     portal_df = pd.read_csv(io.BytesIO(raw_bytes), dtype=str, header=None)
                 else:
-                    portal_df = pd.read_excel(io.BytesIO(raw_bytes), dtype=str, header=None, engine='openpyxl')
+                    portal_df = pd.read_excel(io.BytesIO(raw_bytes), dtype=str, header=None, engine="openpyxl")
                 raw_ids = portal_df.iloc[:, 0].dropna().astype(str).str.strip().tolist()
                 portal_ids = list(dict.fromkeys(raw_ids))
                 st.success("{} unique Order IDs loaded from file.".format(len(portal_ids)))
@@ -539,7 +529,11 @@ elif st.session_state.step == 6:
     c3.metric("Non-CST Orders", len(non_cst_final))
 
     if unmatched_count > 0:
-        st.info("{} FC-bound order(s) were not found in the Unified Portal and have been excluded.".format(unmatched_count))
+        st.info(
+            "{} FC-bound order(s) were not found in the Unified Portal and have been excluded.".format(
+                unmatched_count
+            )
+        )
 
     final_excel = to_excel_bytes({
         "CST Orders": cst_final if not cst_final.empty else pd.DataFrame(columns=REQUIRED_COLUMNS),
@@ -562,17 +556,13 @@ elif st.session_state.step == 6:
 
     st.divider()
     st.warning(
-        "FINAL ACTION REQUIRED
+        """FINAL ACTION REQUIRED
 
-"
-        "1. Download the file above.
-"
-        "2. Copy 'CST Orders' sheet to the CST Task Sheet (Uncovered tab).
-"
-        "3. Copy 'Non-CST Orders' sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
+1. Download the file above.
+2. Copy 'CST Orders' sheet to the CST Task Sheet (Uncovered tab).
+3. Copy 'Non-CST Orders' sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).
 
-"
-        "Audit complete!"
+Audit complete!"""
     )
 
     st.divider()
