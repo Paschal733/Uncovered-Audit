@@ -4,7 +4,7 @@ import re
 import io
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title='Uncovered Orders Audit', page_icon='🚛', layout='wide')
+st.set_page_config(page_title='Uncovered Orders Audit', page_icon='\U0001f69b', layout='wide')
 
 CST_SHIPPERS = [
     'Anheuser-Busch InBev Deutschland GmbH & Co KG', 'ARTSANA S.P.A.',
@@ -123,20 +123,9 @@ def reset_index_display(df):
     df.index = df.index + 1
     return df
 
-defaults = {
-    'step': 1,
-    'df_raw': None,
-    'df_clean': None,
-    'df_formatted': None,
-    'df_step5': None,
-    'cst_ext': None,
-    'non_cst_ext': None,
-    'portal_ids': [],
-    'portal_input_mode': 'Paste IDs directly',
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+defaults = {'step':1,'df_raw':None,'df_clean':None,'df_formatted':None,'df_step5':None,'cst_ext':None,'non_cst_ext':None}
+for k,v in defaults.items():
+    if k not in st.session_state: st.session_state[k] = v
 
 st.title('Uncovered Orders Audit')
 st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
@@ -191,7 +180,7 @@ elif st.session_state.step == 3:
     df = st.session_state.df_clean.copy()
     cols = list(df.columns)
     if len(cols) >= 2:
-        old = cols
+        old = cols[1]
         df = df.rename(columns={old: 'Source'})
         st.markdown('Renamed column {} to Source'.format(old))
     cm = {col.strip().lower(): col for col in df.columns}
@@ -215,6 +204,7 @@ elif st.session_state.step == 3:
     with c2:
         if st.button('Proceed to Step 4 - External Deliveries', type='primary'):
             st.session_state.df_formatted = df; st.session_state.step = 4; st.rerun()
+
 elif st.session_state.step == 4:
     st.header('Step 4 - Process External Deliveries')
     df = st.session_state.df_formatted.copy()
@@ -245,11 +235,7 @@ elif st.session_state.step == 4:
     st.subheader('Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)')
     st.dataframe(reset_index_display(non_cst_ext), use_container_width=True)
     st.divider()
-    msg4 = 'ACTION REQUIRED' + chr(10) + chr(10)
-    msg4 += '1. Copy CST External Orders above to the CST Task Sheet (Uncovered tab).' + chr(10)
-    msg4 += '2. Copy Non-CST External Orders above to the AF Scheduling Daily Task Workbook (Uncovered tab).' + chr(10) + chr(10)
-    msg4 += 'Click Done below once you have completed this step.'
-    st.warning(msg4)
+    st.warning('ACTION REQUIRED1. Copy CST External Orders above to the CST Task Sheet (Uncovered tab).2. Copy Non-CST External Orders above to the AF Scheduling Daily Task Workbook (Uncovered tab).Click Done below once you have completed this step.')
     c1,c2 = st.columns(2)
     with c1:
         if st.button('Back to Step 3'): st.session_state.step = 3; st.rerun()
@@ -258,7 +244,6 @@ elif st.session_state.step == 4:
             st.session_state.cst_ext = cst_ext
             st.session_state.non_cst_ext = non_cst_ext
             st.session_state.df_step5 = intr.drop(columns=['_is_fc'])
-            st.session_state.portal_ids = []
             st.session_state.step = 5; st.rerun()
 
 elif st.session_state.step == 5:
@@ -269,30 +254,22 @@ elif st.session_state.step == 5:
     rids = ds5[oic].dropna().astype(str).str.strip().tolist()
     st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
     with st.expander('View / Copy Order IDs (copy-paste into Unified Portal)'):
-        numbered_lines = []
-        for i, oid in enumerate(rids):
-            numbered_lines.append('{}. {}'.format(i + 1, oid))
-        st.text(chr(10).join(numbered_lines))
+        numbered = ['{}. {}'.format(i+1, oid) for i, oid in enumerate(rids)]
+        st.text(chr(10).join(numbered))
     st.divider()
     st.subheader('Unified Portal Instructions')
-    inst = '1. Copy the Order IDs from the panel above.' + chr(10)
-    inst += '2. Go to the Unified Portal and set ID type to progressive number.' + chr(10)
-    inst += '3. Paste the IDs in batches of 50 and click Submit.' + chr(10)
-    inst += '4. Filter results where appointmentStatus = arrival scheduled.' + chr(10)
-    inst += '5. Note the matching Order IDs.' + chr(10)
-    inst += '6. Come back here and enter the results below.'
-    st.markdown(inst)
+    st.markdown('1. Copy the Order IDs from the panel above.2. Go to the Unified Portal and set ID type to progressive number.3. Paste the IDs in batches of 50 and click Submit.4. Filter results where appointmentStatus = arrival scheduled.5. Note the matching Order IDs.6. Come back here and enter the results below.')
     st.divider()
     st.subheader('Enter Unified Portal Results')
-    im = st.radio('How would you like to provide the matching Order IDs?', ['Paste IDs directly','Upload a results file'], horizontal=True, key='portal_input_mode')
+    im = st.radio('How would you like to provide the matching Order IDs?', ['Paste IDs directly','Upload a results file'], horizontal=True)
     if im == 'Paste IDs directly':
-        pasted = st.text_area('Paste matching Order IDs here (one per line):', height=200, key='pasted_ids')
+        pasted = st.text_area('Paste matching Order IDs here (one per line):', height=200)
         if pasted.strip():
             ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
-            st.session_state.portal_ids = list(dict.fromkeys(ri))
-            st.success('{} unique Order IDs entered.'.format(len(st.session_state.portal_ids)))
+            st.session_state['portal_ids_temp'] = list(dict.fromkeys(ri))
+            st.success('{} unique Order IDs entered.'.format(len(st.session_state['portal_ids_temp'])))
         else:
-            st.session_state.portal_ids = []
+            st.session_state['portal_ids_temp'] = []
     else:
         pf = st.file_uploader('Upload your Unified Portal results file (CSV or Excel, one Order ID per row, no header):', type=['csv','xlsx','xls'], key='portal_upload')
         if pf is not None:
@@ -303,22 +280,21 @@ elif st.session_state.step == 5:
                 else:
                     pdf = pd.read_excel(io.BytesIO(rb), dtype=str, header=None, engine='openpyxl')
                 ri = pdf.iloc[:,0].dropna().astype(str).str.strip().tolist()
-                st.session_state.portal_ids = list(dict.fromkeys(ri))
-                st.success('{} unique Order IDs loaded from file.'.format(len(st.session_state.portal_ids)))
+                st.session_state['portal_ids_temp'] = list(dict.fromkeys(ri))
+                st.success('{} unique Order IDs loaded from file.'.format(len(st.session_state['portal_ids_temp'])))
             except Exception as e:
                 st.error('Error reading file: {}'.format(e))
         else:
-            st.session_state.portal_ids = []
+            st.session_state['portal_ids_temp'] = []
     st.divider()
     c1,c2 = st.columns(2)
     with c1:
-        if st.button('Back to Step 4'):
-            st.session_state.portal_ids = []
-            st.session_state.step = 4; st.rerun()
+        if st.button('Back to Step 4'): st.session_state.step = 4; st.rerun()
     with c2:
-        if st.session_state.portal_ids:
+        portal_ids = st.session_state.get('portal_ids_temp', [])
+        if portal_ids:
             if st.button('Run Cross-Reference and Produce Final Results', type='primary'):
-                ps = set(st.session_state.portal_ids)
+                ps = set(portal_ids)
                 dfc = st.session_state.df_step5.copy()
                 dfc['_in_portal'] = dfc[oic].astype(str).str.strip().isin(ps)
                 mdf = dfc[dfc['_in_portal'] == True].drop(columns=['_in_portal'])
@@ -337,6 +313,7 @@ elif st.session_state.step == 5:
                 st.session_state['unmatched_count'] = uc
                 st.session_state.step = 6; st.rerun()
 
+
 elif st.session_state.step == 6:
     st.header('Audit Complete - Final Results')
     st.balloons()
@@ -349,9 +326,7 @@ elif st.session_state.step == 6:
     c3.metric('Non-CST Orders', len(ncf))
     if uc > 0:
         st.info('{} FC-bound order(s) were not found in the Unified Portal and have been excluded.'.format(uc))
-    cst_out = cf if not cf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
-    non_cst_out = ncf if not ncf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)
-    fb = to_excel_bytes({'CST Orders': cst_out, 'Non-CST Orders': non_cst_out})
+    fb = to_excel_bytes({'CST Orders': cf if not cf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS_CST),'Non-CST Orders': ncf if not ncf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)})
     st.download_button(label='Download Final_Results.xlsx', data=fb, file_name='Final_Results.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     st.divider()
     st.subheader('CST Orders - copy to CST Task Sheet (Uncovered tab)')
@@ -359,12 +334,7 @@ elif st.session_state.step == 6:
     st.subheader('Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)')
     st.dataframe(reset_index_display(ncf), use_container_width=True)
     st.divider()
-    msg6 = 'FINAL ACTION REQUIRED' + chr(10) + chr(10)
-    msg6 += '1. Download the file above.' + chr(10)
-    msg6 += '2. Copy CST Orders sheet to the CST Task Sheet (Uncovered tab).' + chr(10)
-    msg6 += '3. Copy Non-CST Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).' + chr(10) + chr(10)
-    msg6 += 'Audit complete!'
-    st.warning(msg6)
+    st.warning('FINAL ACTION REQUIRED1. Download the file above.2. Copy CST Orders sheet to the CST Task Sheet (Uncovered tab).3. Copy Non-CST Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).Audit complete!')
     st.divider()
     if st.button('Start a New Audit', type='primary'):
         for k in list(st.session_state.keys()): del st.session_state[k]
