@@ -500,7 +500,7 @@ elif st.session_state.step == 5:
         st.session_state.portal_ids = []
 
     if im == 'Paste Order IDs directly':
-        pasted = st.text_area('Paste 'arrival scheduled' Order IDs here', height=200)
+        pasted = st.text_area('Paste |arrival scheduled| Order IDs here', height=200)
         if pasted.strip():
             ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
             st.session_state.portal_ids = list(dict.fromkeys(ri))
