@@ -484,6 +484,7 @@ elif st.session_state.step == 5:
         "2. Go to the Unified Portal and set ID type to progressive number.\n"
         "3. Paste up to 50 IDs and click Submit.\n"
         "4. Filter results where appointmentStatus = arrival scheduled.\n"
+        "5. Note the matching Order IDs.\n"
         "6. Come back here and enter the results below."
     )
 
@@ -499,8 +500,8 @@ elif st.session_state.step == 5:
     if 'portal_ids' not in st.session_state:
         st.session_state.portal_ids = []
 
-    if im == 'Paste Order IDs directly':
-        pasted = st.text_area('Paste arrival scheduled Order IDs here', height=200)
+    if im == 'Paste IDs directly':
+        pasted = st.text_area('Paste matching Order IDs here (one per line):', height=200)
         if pasted.strip():
             ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
             st.session_state.portal_ids = list(dict.fromkeys(ri))
@@ -551,6 +552,7 @@ elif st.session_state.step == 5:
 
     if run_clicked:
         run_cross_reference()
+
 
 # ---- Step 6 ----
 elif st.session_state.step == 6:
