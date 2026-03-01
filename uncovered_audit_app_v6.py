@@ -593,7 +593,7 @@ elif st.session_state.step == 6:
 
     # Copy buttons (values only, no headers, exclude Created by)
     st.divider()
-    st.subheader("Copy-ready blocks (no headers, exclude 'Created by')")
+    st.subheader("Copy-ready blocks")
     cc1, cc2 = st.columns(2)
     with cc1:
         if st.button("Generate copy block: CST Final Orders", key="copy_cst_final"):
