@@ -4,7 +4,7 @@ import re
 import io
 import math
 
-st.set_page_config(page_title='Uncovered Orders Audit', page_icon='\U0001f69b', layout='wide')
+st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
 CST_SHIPPERS = [
     'Anheuser-Busch InBev Deutschland GmbH & Co KG', 'ARTSANA S.P.A.',
