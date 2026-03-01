@@ -239,7 +239,7 @@ st.divider()
 # ---- Step 1 ----
 if st.session_state.step == 1:
     st.header('Step 1 - Upload SMC Export File')
-    st.info('Download the uncovered orders file from SMC TMS (untick LTL, export), then upload it here to begin the audit.')
+    st.info('Download the uncovered orders file from SMC TMS (untick LTL, intermodal) export, then upload it here to begin the audit.')
 
     uploaded = st.file_uploader(
         'Upload your SMC uncovered orders export (.xlsx, .xls, or .csv)',
@@ -290,7 +290,7 @@ elif st.session_state.step == 2:
             st.session_state.step = 1
             st.rerun()
     with c2:
-        if st.button('Proceed to Step 3 - Classify Orders', type='primary'):
+        if st.button('Proceed to Step 3 - Data Processing & Order Classification', type='primary'):
             st.session_state.df_clean = df
             st.session_state.step = 3
             st.rerun()
@@ -391,16 +391,16 @@ elif st.session_state.step == 4:
 
     # Copy buttons (values only, no headers, exclude Created by)
     st.divider()
-    st.subheader("Copy-ready blocks (no headers, exclude 'Created by')")
+    st.subheader("Copy-ready blocks")
     cc1, cc2 = st.columns(2)
     with cc1:
-        if st.button("Generate copy block: CST External (excl. Created by)", key="copy_cst_ext"):
+        if st.button("Generate copy block: CST External Orders", key="copy_cst_ext"):
             st.session_state['_copy_block_cst_ext'] = make_copy_block(cst_ext, exclude_cols=['Created by'])
         blk = st.session_state.get('_copy_block_cst_ext', "")
         if blk:
             st.text_area("CST External copy block (Ctrl+A, Ctrl+C)", value=blk, height=220)
     with cc2:
-        if st.button("Generate copy block: Non-CST External (excl. Created by)", key="copy_non_cst_ext"):
+        if st.button("Generate copy block: Non-CST External Orders", key="copy_non_cst_ext"):
             st.session_state['_copy_block_non_cst_ext'] = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
         blk2 = st.session_state.get('_copy_block_non_cst_ext', "")
         if blk2:
@@ -484,7 +484,6 @@ elif st.session_state.step == 5:
         "2. Go to the Unified Portal and set ID type to progressive number.\n"
         "3. Paste up to 50 IDs and click Submit.\n"
         "4. Filter results where appointmentStatus = arrival scheduled.\n"
-        "5. Note the matching Order IDs.\n"
         "6. Come back here and enter the results below."
     )
 
@@ -500,8 +499,8 @@ elif st.session_state.step == 5:
     if 'portal_ids' not in st.session_state:
         st.session_state.portal_ids = []
 
-    if im == 'Paste IDs directly':
-        pasted = st.text_area('Paste matching Order IDs here (one per line):', height=200)
+    if im == 'Paste Order IDs directly':
+        pasted = st.text_area('Paste 'arrival scheduled' Order IDs here', height=200)
         if pasted.strip():
             ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
             st.session_state.portal_ids = list(dict.fromkeys(ri))
@@ -597,13 +596,13 @@ elif st.session_state.step == 6:
     st.subheader("Copy-ready blocks (no headers, exclude 'Created by')")
     cc1, cc2 = st.columns(2)
     with cc1:
-        if st.button("Generate copy block: CST Final (excl. Created by)", key="copy_cst_final"):
+        if st.button("Generate copy block: CST Final Orders", key="copy_cst_final"):
             st.session_state['_copy_block_cst_final'] = make_copy_block(cf_clean, exclude_cols=['Created by'])
         blk = st.session_state.get('_copy_block_cst_final', "")
         if blk:
             st.text_area("CST Final copy block (Ctrl+A, Ctrl+C)", value=blk, height=220)
     with cc2:
-        if st.button("Generate copy block: Non-CST Final (excl. Created by)", key="copy_non_cst_final"):
+        if st.button("Generate copy block: Scheduling Final Orders", key="copy_non_cst_final"):
             st.session_state['_copy_block_non_cst_final'] = make_copy_block(ncf, exclude_cols=['Created by'])
         blk2 = st.session_state.get('_copy_block_non_cst_final', "")
         if blk2:
