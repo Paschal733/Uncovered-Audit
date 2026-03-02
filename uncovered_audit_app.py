@@ -102,7 +102,7 @@ def is_cst_shipper(name):
     return False
 
 AMAZON_ALIAS_PATTERN = re.compile(r'^[a-z]{5,8}$')
-FC_PATTERN = re.compile(r'^[A-Z]{3}\d{1,2}$')
+FC_PATTERN = re.compile(r'^(?:[A-Z]{3}\d|[A-Z]{4})$')
 
 REQUIRED_COLUMNS = [
     'Order ID','Source','Shipper','Destination Stop Date and Time',
