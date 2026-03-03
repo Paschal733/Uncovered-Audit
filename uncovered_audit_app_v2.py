@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import re
 import io
@@ -6,30 +7,6 @@ import math
 
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
-
-# ----------------------------
-# Helpers: UX
-# ----------------------------
-def scroll_to_top():
-    # Best-effort scroll reset after navigation
-    st.markdown(
-        """
-        <script>
-            window.scrollTo({top: 0, left: 0, behavior: 'instant'});
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
-
-def go_to_step(step_num: int):
-    st.session_state.step = step_num
-    scroll_to_top()
-    st.rerun()
-
-
-# ----------------------------
-# Config / Reference data
-# ----------------------------
 CST_SHIPPERS = [
     'Anheuser-Busch InBev Deutschland GmbH & Co KG', 'ARTSANA S.P.A.',
     'Beiersdorf Customer Supply GmbH', 'BDSK Handels GmbH & Co.KG',
@@ -92,22 +69,6 @@ _STOPWORDS = {
     'kg','spa','sas','sl','nv','ag','plc','ug','bvba','srl','spzoo'
 }
 
-AMAZON_ALIAS_PATTERN = re.compile(r'^[a-z]{5,8}$')
-FC_PATTERN = re.compile(r'^(?:[A-Z]{3}\d|[A-Z]{4})$')
-
-REQUIRED_COLUMNS = [
-    'Order ID','Source','Shipper','Destination Stop Date and Time',
-    'Destination Stop Facility Name','Creation Date and Time','Created by'
-]
-REQUIRED_COLUMNS_CST = [
-    'Order ID','Source','Shipper','Destination Stop Date and Time',
-    'Creation Date and Time','Created by'
-]
-
-
-# ----------------------------
-# Helpers: matching / parsing
-# ----------------------------
 def _normalise(s):
     if not isinstance(s, str):
         return ''
@@ -140,6 +101,18 @@ def is_cst_shipper(name):
         if ov >= 2 and ov / len(t) >= 0.8:
             return True
     return False
+
+AMAZON_ALIAS_PATTERN = re.compile(r'^[a-z]{5,8}$')
+FC_PATTERN = re.compile(r'^(?:[A-Z]{3}\d|[A-Z]{4})$')
+
+REQUIRED_COLUMNS = [
+    'Order ID','Source','Shipper','Destination Stop Date and Time',
+    'Destination Stop Facility Name','Creation Date and Time','Created by'
+]
+REQUIRED_COLUMNS_CST = [
+    'Order ID','Source','Shipper','Destination Stop Date and Time',
+    'Creation Date and Time','Created by'
+]
 
 def is_fc_facility(name):
     if not isinstance(name, str):
@@ -264,12 +237,29 @@ def run_cross_reference():
     st.session_state.cst_final = cst_f
     st.session_state.non_cst_final = non_cst_f
     st.session_state.unmatched_count = unmatched_count
-    go_to_step(6)
+    st.session_state.step = 6
+    st.rerun()
 
+def go_back_one_step():
+    cur = int(st.session_state.step or 1)
+    if cur == 5 and st.session_state.get("step4_skipped", False):
+        st.session_state.step = 3
+    else:
+        st.session_state.step = max(1, cur - 1)
+    st.rerun()
 
-# ----------------------------
-# Session defaults
-# ----------------------------
+def scroll_to_top():
+    components.html(
+        """
+        <script>
+          const main = window.parent.document.querySelector('section.main');
+          if (main) { main.scrollTo(0,0); }
+          window.parent.scrollTo(0,0);
+        </script>
+        """,
+        height=0
+    )
+
 defaults = {
     'step': 1,
     'df_raw': None,
@@ -290,10 +280,13 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# Scroll to top when step changes
+if "last_step" not in st.session_state:
+    st.session_state.last_step = st.session_state.step
+elif st.session_state.step != st.session_state.last_step:
+    scroll_to_top()
+    st.session_state.last_step = st.session_state.step
 
-# ----------------------------
-# UI header / progress
-# ----------------------------
 st.title('Uncovered Orders Audit')
 st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
 st.divider()
@@ -303,10 +296,6 @@ pv = (st.session_state.step - 1) / (len(step_labels) - 1)
 st.progress(pv, text='Step {} of {}: {}'.format(st.session_state.step, len(step_labels), step_labels[st.session_state.step-1]))
 st.divider()
 
-
-# ----------------------------
-# Step 1
-# ----------------------------
 if st.session_state.step == 1:
     st.header('Step 1 - Upload SMC Export File')
     st.info('Download the uncovered orders file from SMC TMS (untick LTL, intermodal) export, then upload it here to begin the audit.')
@@ -326,15 +315,12 @@ if st.session_state.step == 1:
             st.caption('Showing first 10 of {} rows.'.format(len(df)))
 
             if st.button('Proceed to Step 2 - Data Cleanup', type='primary'):
-                go_to_step(2)
+                st.session_state.step = 2
+                st.rerun()
 
         except Exception as e:
             st.error('Error reading file: {}. Please check the file and try again.'.format(e))
 
-
-# ----------------------------
-# Step 2
-# ----------------------------
 elif st.session_state.step == 2:
     st.header('Step 2 - Data Cleanup')
     st.info('Removing test orders (Shipper contains the word Test).')
@@ -358,17 +344,14 @@ elif st.session_state.step == 2:
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button('Back to Step 1'):
-            go_to_step(1)
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
         if st.button('Proceed to Step 3 - Data Processing & Order Classification', type='primary'):
             st.session_state.df_clean = df
-            go_to_step(3)
+            st.session_state.step = 3
+            st.rerun()
 
-
-# ----------------------------
-# Step 3
-# ----------------------------
 elif st.session_state.step == 3:
     st.header('Step 3 - Format Report and Classify Orders')
     st.info('Renaming Column B to Source, keeping only the 7 required columns, and classifying each order as SMC or R4S.')
@@ -402,17 +385,14 @@ elif st.session_state.step == 3:
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button('Back to Step 2'):
-            go_to_step(2)
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
         if st.button('Proceed to Step 4 - External Deliveries', type='primary'):
             st.session_state.df_formatted = df
-            go_to_step(4)
+            st.session_state.step = 4
+            st.rerun()
 
-
-# ----------------------------
-# Step 4
-# ----------------------------
 elif st.session_state.step == 4:
     st.header('Step 4 - Process External Deliveries')
 
@@ -429,7 +409,6 @@ elif st.session_state.step == 4:
     ext = df[df['_is_fc'] == False].copy()
     intr = df[df['_is_fc'] == True].copy()
 
-    # Auto-skip if no external orders
     if ext.empty:
         st.session_state.cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
         st.session_state.non_cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
@@ -438,7 +417,8 @@ elif st.session_state.step == 4:
         st.session_state.arrival_ids_ready = False
         st.session_state.portal_export_filenames = []
         st.session_state.step4_skipped = True
-        go_to_step(5)
+        st.session_state.step = 5
+        st.rerun()
 
     c1, c2 = st.columns(2)
     c1.metric('Internal (FC-bound) Orders', len(intr))
@@ -490,9 +470,8 @@ elif st.session_state.step == 4:
 
     c1, c2 = st.columns(2)
     with c1:
-        # FIX: back only one step
-        if st.button('Back to Step 3'):
-            go_to_step(3)
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
         if st.button('Done - Proceed to Step 5', type='primary'):
             st.session_state.cst_ext = cst_ext
@@ -502,12 +481,9 @@ elif st.session_state.step == 4:
             st.session_state.arrival_ids_ready = False
             st.session_state.portal_export_filenames = []
             st.session_state.step4_skipped = False
-            go_to_step(5)
+            st.session_state.step = 5
+            st.rerun()
 
-
-# ----------------------------
-# Step 5
-# ----------------------------
 elif st.session_state.step == 5:
     st.header('Step 5 - Unified Portal ISA Check')
 
@@ -571,7 +547,6 @@ elif st.session_state.step == 5:
             del st.session_state['portal_export_upload_multi']
         if 'manual_arrivals_paste' in st.session_state:
             del st.session_state['manual_arrivals_paste']
-        scroll_to_top()
         st.rerun()
 
     method = st.radio(
@@ -679,25 +654,18 @@ elif st.session_state.step == 5:
 
     c1, c2 = st.columns(2)
     with c1:
-        # FIX: back one logical step (if step 4 was auto-skipped, back to step 3)
-        back_target = 3 if st.session_state.step4_skipped else 4
-        back_label = 'Back to Step 3' if st.session_state.step4_skipped else 'Back to Step 4'
-        if st.button(back_label):
-            go_to_step(back_target)
-
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
         run_clicked = st.button(
             'Run Cross-Reference and Produce Final Results',
             type='primary',
             disabled=(not ready)
         )
+
     if run_clicked:
         run_cross_reference()
 
-
-# ----------------------------
-# Step 6
-# ----------------------------
 elif st.session_state.step == 6:
     st.header('Audit Complete - Final Results')
     st.balloons()
@@ -769,7 +737,8 @@ elif st.session_state.step == 6:
             'portal_export_upload_multi',
             'manual_arrivals_paste',
             '_copy_block_cst_ext', '_copy_block_non_cst_ext',
-            '_copy_block_cst_final', '_copy_block_non_cst_final'
+            '_copy_block_cst_final', '_copy_block_non_cst_final',
+            'last_step'
         ]
         for k in keys_to_clear:
             if k in st.session_state:
@@ -779,4 +748,5 @@ elif st.session_state.step == 6:
             if k not in st.session_state:
                 st.session_state[k] = v
 
-        go_to_step(1)
+        st.session_state.step = 1
+        st.rerun()
