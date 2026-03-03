@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import re
 import io
@@ -152,13 +153,6 @@ def drop_if_exists(df, col_name):
     return df
 
 def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
-    """
-    Returns a TAB-separated text block with:
-      - NO headers
-      - NO index/serial
-      - excluded columns removed
-    Suitable for paste into Excel/Sheets.
-    """
     if df is None or df.empty:
         return ""
     out = df.copy()
@@ -169,16 +163,49 @@ def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
     lines = ["\t".join(map(str, row)) for row in out.to_numpy()]
     return "\n".join(lines)
 
+def _norm_col(s: str) -> str:
+    return re.sub(r'[\s_\-]+', '', str(s).strip().lower())
+
+def _norm_val(s: str) -> str:
+    return re.sub(r'\s+', ' ', str(s).strip().lower())
+
+def extract_arrival_scheduled_ids_from_unified_portal_csv(df: pd.DataFrame):
+    if df is None or df.empty:
+        return []
+    norm_map = {_norm_col(c): c for c in df.columns}
+    search_col = norm_map.get('searchid')
+    status_col = norm_map.get('appointmentstatus')
+    if not search_col or not status_col:
+        return None
+    s_search = df[search_col].astype(str).map(str.strip)
+    s_status = df[status_col].astype(str).map(_norm_val)
+    mask = (s_status == 'arrival scheduled')
+    ids = s_search[mask].dropna().astype(str).str.strip().tolist()
+    return list(dict.fromkeys([x for x in ids if x]))
+
+def render_wrapped_batches(batch_texts, per_row=3):
+    if not batch_texts:
+        return
+    per_row = max(1, int(per_row))
+    rows = math.ceil(len(batch_texts) / per_row)
+    idx = 0
+    for _ in range(rows):
+        cols = st.columns(per_row)
+        for c in range(per_row):
+            if idx >= len(batch_texts):
+                break
+            b = batch_texts[idx]
+            with cols[c]:
+                st.markdown(f"**{b['label']}**  \n{b['subtitle']}")
+                st.code(b["text"], language=None)
+            idx += 1
+
 def run_cross_reference():
-    """
-    Step 5 core computation: uses session_state.portal_ids + df_step5
-    and advances to step 6.
-    """
-    ds5 = st.session_state.df_step5
+    ds5 = st.session_state.df_step4
     cm = {col.strip().lower(): col for col in ds5.columns}
     oic = cm.get('order id')
     if not oic:
-        st.error("Missing 'Order ID' column for Step 5.")
+        st.error("Missing 'Order ID' column for Step 4.")
         st.stop()
 
     portal_ids = st.session_state.portal_ids
@@ -203,37 +230,74 @@ def run_cross_reference():
     st.session_state.cst_final = cst_f
     st.session_state.non_cst_final = non_cst_f
     st.session_state.unmatched_count = unmatched_count
-    st.session_state.step = 6
+    st.session_state.step = 5
     st.rerun()
+
+def go_back_one_step():
+    cur = int(st.session_state.step or 1)
+    # Special case: if External Orders step (Step 3) was skipped, then Step 4 should go back to Step 2
+    if cur == 4 and st.session_state.get("step3_skipped", False):
+        st.session_state.step = 2
+    else:
+        st.session_state.step = max(1, cur - 1)
+    st.rerun()
+
+def scroll_to_top():
+    components.html(
+        """
+        <script>
+          const main = window.parent.document.querySelector('section.main');
+          if (main) { main.scrollTo(0,0); }
+          window.parent.scrollTo(0,0);
+        </script>
+        """,
+        height=0
+    )
 
 # ---- session state defaults ----
 defaults = {
     'step': 1,
     'df_raw': None,
-    'df_clean': None,
-    'df_formatted': None,
-    'df_step5': None,
+    'df_formatted': None,   # output of merged Step 2
+    'df_step4': None,       # FC-bound orders for portal check
     'cst_ext': None,
     'non_cst_ext': None,
     'portal_ids': [],
     'cst_final': None,
     'non_cst_final': None,
     'unmatched_count': 0,
-    'step4_skipped': False,
-    'batch_index': 0,
+    'step3_skipped': False,  # External Orders step skipped
+    'arrival_ids_ready': False,
+    'portal_export_filenames': [],
+    'last_step': None,
 }
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# Scroll to top when step changes
+if st.session_state.last_step is None:
+    st.session_state.last_step = st.session_state.step
+elif st.session_state.step != st.session_state.last_step:
+    scroll_to_top()
+    st.session_state.last_step = st.session_state.step
 
 # ---- UI header / progress ----
 st.title('Uncovered Orders Audit')
 st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
 st.divider()
 
-step_labels = ['1. Load File','2. Cleanup','3. Classify','4. External Orders','5. Portal Check','6. Final Results']
+step_labels = [
+    '1. Load File',
+    '2. Data Cleanup and Order Classification',
+    '3. External Orders',
+    '4. Portal Check',
+    '5. Final Results'
+]
 pv = (st.session_state.step - 1) / (len(step_labels) - 1)
-st.progress(pv, text='Step {} of {}: {}'.format(st.session_state.step, len(step_labels), step_labels[st.session_state.step-1]))
+st.progress(pv, text='Step {} of {}: {}'.format(
+    st.session_state.step, len(step_labels), step_labels[st.session_state.step-1]
+))
 st.divider()
 
 # ---- Step 1 ----
@@ -255,92 +319,94 @@ if st.session_state.step == 1:
             st.dataframe(df.head(10), use_container_width=True)
             st.caption('Showing first 10 of {} rows.'.format(len(df)))
 
-            if st.button('Proceed to Step 2 - Data Cleanup', type='primary'):
+            if st.button('Proceed to Step 2 - Data Cleanup and Order Classification', type='primary'):
                 st.session_state.step = 2
                 st.rerun()
 
         except Exception as e:
             st.error('Error reading file: {}. Please check the file and try again.'.format(e))
 
-# ---- Step 2 ----
+# ---- Step 2 (merged cleanup + classify) ----
 elif st.session_state.step == 2:
-    st.header('Step 2 - Data Cleanup')
-    st.info('Removing test orders (Shipper contains the word Test).')
+    st.header('Step 2 - Data Cleanup and Order Classification')
+    st.info(
+        "This step performs all of the following in one go:\n"
+        "- Remove Test orders (Shipper contains 'Test')\n"
+        "- Remove any row containing a cell with value 'Dummy' (case-insensitive)\n"
+        "- Rename Column B to 'Source'\n"
+        "- Keep only the required 7 columns\n"
+        "- Classify each order as SMC or R4S (based on 'Created by')"
+    )
 
     df = st.session_state.df_raw.copy()
-    ic = len(df)
-    log = []
+    initial_count = len(df)
 
+    # Build column map
     cm = {col.strip().lower(): col for col in df.columns}
-    sc = cm.get('shipper')
-    if sc:
-        b = len(df)
-        df = df[~df[sc].str.contains('test', case=False, na=False)]
-        log.append('Removed {} test order(s).'.format(b - len(df)))
 
-    log.append('Cleanup complete. {} removed. {} remaining.'.format(ic - len(df), len(df)))
-    for msg in log:
-        st.markdown(msg)
+    # Remove rows where ANY cell equals 'Dummy' (case-insensitive)
+    df_str = df.astype(str)
+    dummy_mask = df_str.apply(lambda col: col.str.strip().str.lower().eq('dummy'), axis=0).any(axis=1)
 
+    # Remove rows where Shipper contains 'test' (case-insensitive) if Shipper column exists
+    shipper_col = cm.get('shipper')
+    if shipper_col:
+        test_mask = df[shipper_col].astype(str).str.contains('test', case=False, na=False)
+    else:
+        test_mask = pd.Series([False] * len(df), index=df.index)
+
+    remove_mask = dummy_mask | test_mask
+    removed = int(remove_mask.sum())
+    df = df.loc[~remove_mask].copy()
+
+    st.markdown(f"- Removed **{removed}** row(s) (Test/Dummy).")
+    st.markdown(f"- Remaining: **{len(df)}** (from {initial_count}).")
+
+    # Rename column B to Source
+    cols = list(df.columns)
+    if len(cols) >= 2:
+        old_b = cols[1]
+        df = df.rename(columns={old_b: 'Source'})
+        st.markdown(f"- Renamed column **{old_b}** to **Source**.")
+
+    # Keep only required columns
+    cm2 = {col.strip().lower(): col for col in df.columns}
+    missing = [c for c in REQUIRED_COLUMNS if c.lower() not in cm2]
+    if missing:
+        st.warning(f"Missing required columns: {missing}")
+
+    keep_cols = [cm2[c.lower()] for c in REQUIRED_COLUMNS if c.lower() in cm2]
+    df = df[keep_cols].copy()
+
+    # Classify Source using Created by
+    cm3 = {col.strip().lower(): col for col in df.columns}
+    created_by_col = cm3.get('created by')
+    if created_by_col:
+        df['Source'] = df[created_by_col].apply(classify_source)
+        smc_count = int((df['Source'] == 'SMC').sum())
+        r4s_count = int((df['Source'] == 'R4S').sum())
+        x1, x2, x3 = st.columns(3)
+        x1.metric('Total Orders', len(df))
+        x2.metric('SMC Orders', smc_count)
+        x3.metric('R4S Orders', r4s_count)
+
+    st.divider()
+    st.subheader("Preview (post-cleanup & classification)")
     st.dataframe(reset_index_display(df), use_container_width=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button('Back to Step 1'):
-            st.session_state.step = 1
-            st.rerun()
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
-        if st.button('Proceed to Step 3 - Data Processing & Order Classification', type='primary'):
-            st.session_state.df_clean = df
+        if st.button('Proceed to Step 3 - External Orders', type='primary'):
+            st.session_state.df_formatted = df
             st.session_state.step = 3
             st.rerun()
 
-# ---- Step 3 ----
+# ---- Step 3 (was Step 4) ----
 elif st.session_state.step == 3:
-    st.header('Step 3 - Format Report and Classify Orders')
-    st.info('Renaming Column B to Source, keeping only the 7 required columns, and classifying each order as SMC or R4S.')
-
-    df = st.session_state.df_clean.copy()
-    cols = list(df.columns)
-    if len(cols) >= 2:
-        old = cols[1]
-        df = df.rename(columns={old: 'Source'})
-        st.markdown('Renamed column {} to Source'.format(old))
-
-    cm = {col.strip().lower(): col for col in df.columns}
-    miss = [c for c in REQUIRED_COLUMNS if c.lower() not in cm]
-    if miss:
-        st.warning('Missing required columns: {}'.format(miss))
-
-    keep_cols = [cm[c.lower()] for c in REQUIRED_COLUMNS if c.lower() in cm]
-    df = df[keep_cols].copy()
-
-    cbc = cm.get('created by')
-    if cbc:
-        df['Source'] = df[cbc].apply(classify_source)
-        sc2 = (df['Source'] == 'SMC').sum()
-        rc2 = (df['Source'] == 'R4S').sum()
-        x1, x2, x3 = st.columns(3)
-        x1.metric('Total Orders', len(df))
-        x2.metric('SMC Orders', sc2)
-        x3.metric('R4S Orders', rc2)
-
-    st.dataframe(reset_index_display(df), use_container_width=True)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button('Back to Step 2'):
-            st.session_state.step = 2
-            st.rerun()
-    with c2:
-        if st.button('Proceed to Step 4 - External Deliveries', type='primary'):
-            st.session_state.df_formatted = df
-            st.session_state.step = 4
-            st.rerun()
-
-# ---- Step 4 ----
-elif st.session_state.step == 4:
-    st.header('Step 4 - Process External Deliveries')
+    st.header('Step 3 - Process External Orders')
 
     df = st.session_state.df_formatted.copy()
     cm = {col.strip().lower(): col for col in df.columns}
@@ -348,7 +414,7 @@ elif st.session_state.step == 4:
     shc = cm.get('shipper')
 
     if not fc or not shc:
-        st.error("Missing required columns for Step 4. Ensure the export contains 'Destination Stop Facility Name' and 'Shipper'.")
+        st.error("Missing required columns for this step. Ensure the export contains 'Destination Stop Facility Name' and 'Shipper'.")
         st.stop()
 
     df['_is_fc'] = df[fc].apply(is_fc_facility)
@@ -359,11 +425,12 @@ elif st.session_state.step == 4:
     if ext.empty:
         st.session_state.cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
         st.session_state.non_cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
-        st.session_state.df_step5 = intr.drop(columns=['_is_fc'])
+        st.session_state.df_step4 = intr.drop(columns=['_is_fc'])
         st.session_state.portal_ids = []
-        st.session_state.batch_index = 0
-        st.session_state.step4_skipped = True
-        st.session_state.step = 5
+        st.session_state.arrival_ids_ready = False
+        st.session_state.portal_export_filenames = []
+        st.session_state.step3_skipped = True
+        st.session_state.step = 4
         st.rerun()
 
     c1, c2 = st.columns(2)
@@ -389,22 +456,23 @@ elif st.session_state.step == 4:
     st.subheader('Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)')
     st.dataframe(reset_index_display(non_cst_ext), use_container_width=True)
 
-    # Copy buttons (values only, no headers, exclude Created by)
     st.divider()
-    st.subheader("Copy-ready blocks")
+    st.subheader("Copy-ready blocks (one-click copy via copy icon)")
     cc1, cc2 = st.columns(2)
     with cc1:
         if st.button("Generate copy block: CST External Orders", key="copy_cst_ext"):
             st.session_state['_copy_block_cst_ext'] = make_copy_block(cst_ext, exclude_cols=['Created by'])
         blk = st.session_state.get('_copy_block_cst_ext', "")
         if blk:
-            st.text_area("CST External copy block (Ctrl+A, Ctrl+C)", value=blk, height=220)
+            st.caption("CST External copy block: click the copy icon (top-right of code box)")
+            st.code(blk, language=None)
     with cc2:
         if st.button("Generate copy block: Non-CST External Orders", key="copy_non_cst_ext"):
             st.session_state['_copy_block_non_cst_ext'] = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
         blk2 = st.session_state.get('_copy_block_non_cst_ext', "")
         if blk2:
-            st.text_area("Non-CST External copy block (Ctrl+A, Ctrl+C)", value=blk2, height=220)
+            st.caption("Non-CST External copy block: click the copy icon (top-right of code box)")
+            st.code(blk2, language=None)
 
     st.divider()
     st.warning(
@@ -416,38 +484,37 @@ elif st.session_state.step == 4:
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button('Back to Step 3'):
-            st.session_state.step = 3
-            st.rerun()
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
-        if st.button('Done - Proceed to Step 5', type='primary'):
+        if st.button('Done - Proceed to Step 4', type='primary'):
             st.session_state.cst_ext = cst_ext
             st.session_state.non_cst_ext = non_cst_ext
-            st.session_state.df_step5 = intr.drop(columns=['_is_fc'])
+            st.session_state.df_step4 = intr.drop(columns=['_is_fc'])
             st.session_state.portal_ids = []
-            st.session_state.batch_index = 0
-            st.session_state.step4_skipped = False
-            st.session_state.step = 5
+            st.session_state.arrival_ids_ready = False
+            st.session_state.portal_export_filenames = []
+            st.session_state.step3_skipped = False
+            st.session_state.step = 4
             st.rerun()
 
-# ---- Step 5 ----
-elif st.session_state.step == 5:
-    st.header('Step 5 - Unified Portal ISA Check')
+# ---- Step 4 (was Step 5) ----
+elif st.session_state.step == 4:
+    st.header('Step 4 - Unified Portal ISA Check')
 
-    if st.session_state.step4_skipped:
-        st.info("Step 4 was skipped automatically because **External Orders = 0**. Proceeding directly with FC-bound orders portal check.")
+    if st.session_state.step3_skipped:
+        st.info("Step 3 was skipped automatically because **External Orders = 0**. Proceeding directly with FC-bound orders portal check.")
 
-    ds5 = st.session_state.df_step5
-    cm = {col.strip().lower(): col for col in ds5.columns}
+    ds4 = st.session_state.df_step4
+    cm = {col.strip().lower(): col for col in ds4.columns}
     oic = cm.get('order id')
     if not oic:
-        st.error("Missing 'Order ID' column for Step 5.")
+        st.error("Missing 'Order ID' column for Step 4.")
         st.stop()
 
-    rids = ds5[oic].dropna().astype(str).str.strip().tolist()
+    rids = ds4[oic].dropna().astype(str).str.strip().tolist()
     st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
 
-    # Batch copy (50 per batch), NO SERIAL NUMBERS in copy block
     batch_size = 50
     total = len(rids)
     batch_count = max(1, math.ceil(total / batch_size))
@@ -456,106 +523,166 @@ elif st.session_state.step == 5:
         if total == 0:
             st.warning("No Order IDs available to copy.")
         else:
-            st.caption(f"Copy/paste into Unified Portal in batches of {batch_size}. (IDs copy without serial numbers.)")
+            st.caption("Batches are displayed in a wrapped grid. One-click copy each batch using the copy icon.")
 
-            btn_cols = st.columns(min(batch_count, 6))
-            for i in range(min(batch_count, 6)):
-                if btn_cols[i].button(f"Batch {i+1}", key=f"batch_btn_{i}"):
-                    st.session_state.batch_index = i
+            batches = []
+            for i in range(batch_count):
+                start = i * batch_size
+                end = min(start + batch_size, total)
+                batch_ids = rids[start:end]
+                if not batch_ids:
+                    continue
+                batches.append({
+                    "label": f"Batch {i+1}",
+                    "subtitle": f"{start+1}–{end} of {total}",
+                    "text": "\n".join(batch_ids),
+                })
 
-            bi = int(st.session_state.batch_index or 0)
-            bi = max(0, min(bi, batch_count - 1))
-            st.session_state.batch_index = bi
-
-            start = bi * batch_size
-            end = min(start + batch_size, total)
-            batch_ids = rids[start:end]
-
-            st.text_area(
-                f"Batch {bi+1} IDs ({start+1}–{end} of {total})",
-                value="\n".join(batch_ids),
-                height=260
-            )
+            render_wrapped_batches(batches, per_row=3)
 
     st.divider()
-    st.subheader('Unified Portal Instructions')
+    st.subheader('Unified Portal Workflow (New)')
     st.markdown(
-        "1. Copy a batch of Order IDs from the panel above.\n"
-        "2. Go to the Unified Portal and set ID type to progressive number.\n"
-        "3. Paste up to 50 IDs and click Submit.\n"
-        "4. Filter results where appointmentStatus = arrival scheduled.\n"
-        "5. Note the matching Order IDs.\n"
-        "6. Come back here and enter the results below."
+        "1. Copy Order IDs above into Unified Portal (in batches of 50).\n"
+        "2. Run the search in Unified Portal.\n"
+        "3. Export / Download the search results as **CSV**.\n"
+        "4. Upload **all CSV files** from each batch below.\n"
+        "5. The tool will automatically extract **Arrival Scheduled** IDs from `searchId`.\n"
+        "6. Once extracted, the **Run Cross-Reference** button will activate."
     )
 
     st.divider()
-    st.subheader('Enter Unified Portal Results')
+    st.subheader('Upload Unified Portal Results CSV(s)')
 
-    im = st.radio(
-        'How would you like to provide the matching Order IDs?',
-        ['Paste IDs directly', 'Upload a results file'],
+    if st.button("Reset Step 4 Inputs", key="reset_step4"):
+        st.session_state.portal_ids = []
+        st.session_state.arrival_ids_ready = False
+        st.session_state.portal_export_filenames = []
+        if 'portal_export_upload_multi' in st.session_state:
+            del st.session_state['portal_export_upload_multi']
+        if 'manual_arrivals_paste' in st.session_state:
+            del st.session_state['manual_arrivals_paste']
+        st.rerun()
+
+    method = st.radio(
+        "How do you want to provide Unified Portal results?",
+        ["Upload Unified Portal CSV export(s) (recommended)", "Paste Arrival Scheduled Order IDs manually (fallback)"],
         horizontal=True
     )
 
-    if 'portal_ids' not in st.session_state:
-        st.session_state.portal_ids = []
+    if method.startswith("Upload"):
+        portal_csvs = st.file_uploader(
+            "Upload Unified Portal export CSV file(s). You can upload multiple files (one per 50-ID search batch). "
+            "Each CSV must contain columns: searchId and appointmentStatus.",
+            type=['csv'],
+            accept_multiple_files=True,
+            key='portal_export_upload_multi'
+        )
 
-    if im == 'Paste IDs directly':
-        pasted = st.text_area('Paste (arrival scheduled) Order IDs here:', height=200)
-        if pasted.strip():
-            ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
-            st.session_state.portal_ids = list(dict.fromkeys(ri))
-            st.success(f"{len(st.session_state.portal_ids)} unique Order IDs entered.")
-        else:
-            st.session_state.portal_ids = []
+        if portal_csvs:
+            all_arrival_ids = []
+            files_ok = 0
+            files_missing_cols = 0
+            files_read_error = 0
+            zero_arrivals = 0
+            filenames = []
+
+            for f in portal_csvs:
+                filenames.append(getattr(f, "name", "unknown.csv"))
+                try:
+                    raw = f.read()
+                    pdf = pd.read_csv(io.BytesIO(raw), dtype=str)
+
+                    arrival_ids = extract_arrival_scheduled_ids_from_unified_portal_csv(pdf)
+                    if arrival_ids is None:
+                        files_missing_cols += 1
+                        continue
+
+                    files_ok += 1
+                    if len(arrival_ids) == 0:
+                        zero_arrivals += 1
+                    else:
+                        all_arrival_ids.extend(arrival_ids)
+
+                except Exception:
+                    files_read_error += 1
+
+            all_arrival_ids = list(dict.fromkeys([x for x in all_arrival_ids if x]))
+
+            if files_missing_cols > 0:
+                st.error(
+                    f"{files_missing_cols} file(s) did not contain required columns "
+                    f"('searchId' and 'appointmentStatus')."
+                )
+            if files_read_error > 0:
+                st.error(f"{files_read_error} file(s) could not be read as CSV.")
+
+            st.info(
+                f"Files uploaded: {len(portal_csvs)} | Parsed OK: {files_ok} | "
+                f"0 arrivals: {zero_arrivals} | Arrival Scheduled IDs extracted: {len(all_arrival_ids)}"
+            )
+
+            with st.expander("Show uploaded filenames"):
+                st.write(filenames)
+
+            if len(all_arrival_ids) == 0:
+                st.session_state.portal_ids = []
+                st.session_state.arrival_ids_ready = False
+                st.session_state.portal_export_filenames = filenames
+                st.warning("No 'Arrival Scheduled' rows were found across the uploaded file(s).")
+            else:
+                st.session_state.portal_ids = all_arrival_ids
+                st.session_state.arrival_ids_ready = True
+                st.session_state.portal_export_filenames = filenames
+                st.success(
+                    f"Done. Combined {len(all_arrival_ids)} unique 'Arrival Scheduled' Order IDs "
+                    f"from {files_ok} CSV file(s)."
+                )
+                with st.expander("Preview extracted Arrival Scheduled IDs"):
+                    st.caption("One-click copy via copy icon (top-right of code box)")
+                    st.code("\n".join(all_arrival_ids), language=None)
 
     else:
-        pf = st.file_uploader(
-            'Upload your Unified Portal results file (CSV or Excel, one Order ID per row, no header):',
-            type=['csv', 'xlsx', 'xls'],
-            key='portal_upload'
+        pasted = st.text_area(
+            "Paste (Arrival Scheduled) Order IDs here:",
+            height=200,
+            key="manual_arrivals_paste"
         )
-        if pf is not None:
-            try:
-                rb = pf.read()
-                if pf.name.lower().endswith('.csv'):
-                    pdf = pd.read_csv(io.BytesIO(rb), dtype=str, header=None)
-                else:
-                    pdf = pd.read_excel(io.BytesIO(rb), dtype=str, header=None, engine='openpyxl')
-
-                ri = pdf.iloc[:, 0].dropna().astype(str).str.strip().tolist()
-                st.session_state.portal_ids = list(dict.fromkeys(ri))
-                st.success(f"{len(st.session_state.portal_ids)} unique Order IDs loaded from file.")
-            except Exception as e:
-                st.session_state.portal_ids = []
-                st.error(f"Error reading file: {e}")
+        if pasted.strip():
+            ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
+            ids = list(dict.fromkeys(ri))
+            if ids:
+                st.session_state.portal_ids = ids
+                st.session_state.arrival_ids_ready = True
+                st.session_state.portal_export_filenames = []
+                st.success(f"{len(ids)} unique Order IDs entered.")
+                with st.expander("Preview / Copy pasted IDs"):
+                    st.caption("One-click copy via copy icon (top-right of code box)")
+                    st.code("\n".join(ids), language=None)
         else:
-            st.session_state.portal_ids = []
+            st.info("Paste IDs to enable the cross-reference button.")
 
     st.divider()
-
-    portal_ids = st.session_state.portal_ids
-    current_count = len(portal_ids)
+    ready = bool(st.session_state.arrival_ids_ready and len(st.session_state.portal_ids) > 0)
+    if ready:
+        st.info("Arrival Scheduled Order IDs are ready. You can now run the final cross-reference.")
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button('Back to Step 4'):
-            st.session_state.step = 4
-            st.rerun()
-
+        if st.button('Back a step'):
+            go_back_one_step()
     with c2:
         run_clicked = st.button(
             'Run Cross-Reference and Produce Final Results',
             type='primary',
-            disabled=(current_count == 0)
+            disabled=(not ready)
         )
 
     if run_clicked:
         run_cross_reference()
 
-
-# ---- Step 6 ----
-elif st.session_state.step == 6:
+# ---- Step 5 (was Step 6) ----
+elif st.session_state.step == 5:
     st.header('Audit Complete - Final Results')
     st.balloons()
 
@@ -563,7 +690,6 @@ elif st.session_state.step == 6:
     ncf = st.session_state.non_cst_final if st.session_state.non_cst_final is not None else pd.DataFrame(columns=REQUIRED_COLUMNS)
     uc = int(st.session_state.unmatched_count or 0)
 
-    # CST FINAL results: remove Destination Stop Facility Name
     cf_clean = drop_if_exists(cf, 'Destination Stop Facility Name')
 
     c1, c2, c3 = st.columns(3)
@@ -593,22 +719,23 @@ elif st.session_state.step == 6:
     st.subheader('Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)')
     st.dataframe(reset_index_display(ncf), use_container_width=True)
 
-    # Copy buttons (values only, no headers, exclude Created by)
     st.divider()
-    st.subheader("Copy-ready blocks")
+    st.subheader("Copy-ready blocks (one-click copy via copy icon)")
     cc1, cc2 = st.columns(2)
     with cc1:
         if st.button("Generate copy block: CST Final Orders", key="copy_cst_final"):
             st.session_state['_copy_block_cst_final'] = make_copy_block(cf_clean, exclude_cols=['Created by'])
         blk = st.session_state.get('_copy_block_cst_final', "")
         if blk:
-            st.text_area("CST Final copy block (Ctrl+A, Ctrl+C)", value=blk, height=220)
+            st.caption("CST Final copy block: click the copy icon (top-right of code box)")
+            st.code(blk, language=None)
     with cc2:
         if st.button("Generate copy block: Scheduling Final Orders", key="copy_non_cst_final"):
             st.session_state['_copy_block_non_cst_final'] = make_copy_block(ncf, exclude_cols=['Created by'])
         blk2 = st.session_state.get('_copy_block_non_cst_final', "")
         if blk2:
-            st.text_area("Non-CST Final copy block (Ctrl+A, Ctrl+C)", value=blk2, height=220)
+            st.caption("Non-CST Final copy block: click the copy icon (top-right of code box)")
+            st.code(blk2, language=None)
 
     st.divider()
     st.warning(
@@ -622,17 +749,17 @@ elif st.session_state.step == 6:
     st.divider()
     if st.button('Start a New Audit', type='primary'):
         keys_to_clear = list(defaults.keys()) + [
-            'smc_upload', 'portal_upload',
+            'smc_upload',
+            'portal_export_upload_multi',
+            'manual_arrivals_paste',
             '_copy_block_cst_ext', '_copy_block_non_cst_ext',
-            '_copy_block_cst_final', '_copy_block_non_cst_final'
+            '_copy_block_cst_final', '_copy_block_non_cst_final',
         ]
         for k in keys_to_clear:
             if k in st.session_state:
                 del st.session_state[k]
-
         for k, v in defaults.items():
             if k not in st.session_state:
                 st.session_state[k] = v
-
         st.session_state.step = 1
         st.rerun()
