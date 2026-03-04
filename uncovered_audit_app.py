@@ -4,6 +4,7 @@ import pandas as pd
 import re
 import io
 import math
+import unicodedata  # <-- ADDED
 
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
@@ -69,15 +70,45 @@ _STOPWORDS = {
     'kg','spa','sas','sl','nv','ag','plc','ug','bvba','srl','spzoo'
 }
 
+# ---------------------------
+# ADDED: German umlaut folding + diacritic stripping
+# ---------------------------
+def _de_umlaut_fold(s: str) -> str:
+    """
+    Convert German umlauts to common ASCII spellings.
+    Examples: Mömax -> Moemax, Müller -> Mueller, Straße -> Strasse
+    Also strips other diacritics.
+    """
+    if not isinstance(s, str):
+        return ""
+
+    # German-specific folding
+    s = (s.replace("Ä", "Ae").replace("Ö", "Oe").replace("Ü", "Ue")
+           .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
+           .replace("ß", "ss"))
+
+    # Remove any remaining diacritics
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s
+
+# ---------------------------
+# MODIFIED: _normalise uses umlaut folding
+# ---------------------------
 def _normalise(s):
     if not isinstance(s, str):
         return ''
+    s = _de_umlaut_fold(s)
     s = re.sub(r'[^\w\s]', '', s)
     s = re.sub(r'\s+', ' ', s)
     return s.strip().lower()
 
+# ---------------------------
+# MODIFIED: _core_tokens uses umlaut folding
+# ---------------------------
 def _core_tokens(s):
-    words = re.sub(r'[^\w\s]', ' ', str(s)).lower().split()
+    s = _de_umlaut_fold(str(s))
+    words = re.sub(r'[^\w\s]', ' ', s).lower().split()
     return frozenset(w for w in words if len(w) > 2 and w not in _STOPWORDS)
 
 _CST_EXACT  = set(s.strip().lower() for s in CST_SHIPPERS)
