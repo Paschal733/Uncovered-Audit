@@ -4,97 +4,146 @@ import pandas as pd
 import re
 import io
 import math
-import unicodedata  # <-- ADDED
+import unicodedata
 
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
 CST_SHIPPERS = [
-    'Anheuser-Busch InBev Deutschland GmbH & Co KG', 'ARTSANA S.P.A.',
-    'Beiersdorf Customer Supply GmbH', 'BDSK Handels GmbH & Co.KG',
-    'Charles Kendall Freight', 'EST contracts B.V.', 'Coyote Logistics UK Ltd',
-    'DANONE NUTRICIA SPA', 'Danone UK', 'DANONE IT SN', 'Danone UK SN',
-    'DELONGHI APPLIANCES', 'Howard Tenens', 'DGL- Ingram (KSP) ES',
+    'Amazon Business',
+    'Anheuser-Busch InBev Deutschland GmbH & Co KG',
+    'ARTSANA S.P.A.',
+    'Brita France',
+    'BRITA SE - Shipments Beselich',
+    'Brita Italia s.r.l. Unipersonale',
+    'Coyote Logistics UK Ltd',
+    'Danone UK',
+    'DANONE IT SN',
+    'Danone UK SN',
+    'DELONGHI APPLIANCES',
+    'Electrolux Hausgeräte GmbH',
+    'Fressnapf Logistics Management GmbH',
+    'Hachette UK Distribution',
+    'HarperCollins Publishers Ltd',
+    'Hisense UK',
+    'Howard Tenens',
+    'Eddie Stobart (Appleton Culina House- Culina Group)',
     'Eddie Stobart (Appleton Culina House- Culina Group) Unilever',
-    'Great Bear Distribution CHORLEY', 'Great Bear Distribution Ltd (Spectrum)',
-    'Great Bear Distribution MV1', 'Great Bear Distribution OLDHAM',
-    'Great Bear MV1 - Helen of Troy', 'Great Bear Distribution SHEFFIELD',
-    'Great Bear Port Salford', 'Great Bear Port Salford Mars',
-    'H.J. Heinz BV', 'Hoover Ltd', 'iRobot UK Ltd',
-    'JACOBS DOUWE EGBERTS GB LTD', 'JYSK SE',
+    'Geodis D&E Normandie',
+    'Great Bear Distribution MV1',
+    'Great Bear Port Salford Mars',
+    'H.J. Heinz BV',
+    'home24 eLogistics GmbH & Co. KG',
+    'Hoover Ltd',
+    'iRobot UK Ltd',
+    'JACOBS DOUWE EGBERTS GB LTD',
     'Kellogg Marketing And Sales Company (UK) Limited',
-    'Keter Italia S.p.A.', 'Keter Iberia S.L.U', 'Keter Germany Gmbh', 'Keter France Sas',
-    'Mars PF France', 'Mars GmbH (CBT-DE)', 'Mars Multisales Spain S.L.',
-    'Mars Food Europe CV', 'Mars GmbH FLOERSHEIM', 'Mars GmbH MINDEN',
-    'Messaggerie Libri Spa', 'Moemax Logistik GmbH', 'Mondi Logistik GmbH',
-    'Nestle Enterprises SA, Business Growth Solutions Division', 'Nestle UK',
-    'Nestrade S.A. T-Hub Central', 'Nestrade SA (t-hub North)',
-    'Nestrade S.A. T-Hub North', 'Nestrade S.A. T-Hub South',
-    'Nestrade SA', 'Nestrade SA (Worms)', 'Nestrade T-hub West',
-    'PepsiCo Deutschland GmbH', 'Philips Consumer Lifestyle BV', 'Pregis Ltd',
+    'Keter Italia S.p.A.',
+    'Keter Iberia S.L.U',
+    'Keter Germany Gmbh',
+    'Keter France Sas',
+    'Mars PF France',
+    'Mars GmbH (CBT-DE)',
+    'Mars GmbH FLOERSHEIM',
+    'Mars GmbH MINDEN',
+    'Messaggerie Libri Spa',
+    'Mömax Logistik GmbH',
+    'Mondi Logistik GmbH',
+    'Nestlé Enterprises SA, Business Growth Solutions Division',
+    'Nestlé UK',
+    'Nestrade S.A. T-Hub Central',
+    'Nestrade SA (t-hub North)',
+    'Nestrade S.A. T-Hub South',
+    'Nestrade T-hub West',
+    'PepsiCo Deutschland GmbH',
     'Procter & Gamble International Operations SA',
-    'Robert Bosch Power Tools GmbH', 'Samsonite GmBH', 'saturn petcare gmbh',
-    'Skechers EDC', 'SharkNinja Europe Ltd', 'SharkNinja Germany Gmbh',
-    'SIG Combibloc GmbH - Linnich', 'SIG Combibloc GmbH - Wittenberg',
-    'S.L. Systemlogistik GmbH', 'Soffass spa', 'Sofidel Germany GmbH',
-    'Sofidel France SAS', 'Sofidel Spain', 'Sofidel UK',
-    'Spectrum Brands (UK) Ltd', 'Tetra GmbH', 'TYRE ECO CHAIN',
-    'The Book Service Limited', 'Unilever Europe B.V. (UK)',
-    'Unilever Europe B.V. (DE)', 'Unilever Europe B.V. (EU)',
-    'Versuni Nederland B.V', 'Walkers Snacks Distribution Ltd',
-    'Wincanton (J SAINSBURY PLC)', 'Yankee Candle Co (Europe) LTD',
-    'Yankee Candle Co - DE', 'Zalando SE', 'Zeitfracht Medien GmbH',
-    'Danone Deutschland GmbH', 'Danone UK Waters', 'Danone FR', 'Tchibo GmbH',
-    'Hachette UK Distribution', 'Wacker Chemie AG',
-    'Electrolux Hausgeraete GmbH', 'Sharp Consumer Electronics Poland sp. z o.o.',
-    'Brita France', 'BRITA SE - Shipments Beselich',
-    'Brita Italia s.r.l. Unipersonale', 'home24 eLogistics GmbH & Co. KG',
-    'Cargill Poland Sp. z o.o.', 'Nitto Advanced Film Gronau GmbH',
-    'Cargill S.L.U.', 'Coca-Cola Europacific Partners Deutschland GmbH',
-    'Schlaadt HighCut GmbH', 'Fressnapf Logistics Management GmbH',
-    'tegut... gute Lebensmittel GmbH & Co. KG', 'Bio Springer',
+    'REHAU Industries SE & Co. KG',
+    'Robert Bosch Power Tools GmbH',
+    'Skechers EDC',
+    'SharkNinja Europe Ltd',
+    'SharkNinja Germany Gmbh',
+    'Schlaadt HighCut GmbH',
+    'S.L. Systemlogistik GmbH',
+    'Soffass spa',
+    'Sofidel Germany GmbH',
+    'Sofidel France SAS',
+    'Sofidel Spain',
+    'Sofidel UK',
+    'tegut… gute Lebensmittel GmbH & Co. KG',
+    'Tetra GmbH',
+    'The Book Service Limited',
+    'Unilever Europe B.V. (UK)',
+    'Unilever Europe B.V. (DE)',
+    'Unilever Europe B.V. (EU)',
+    'Vendor Returns',
+    'Versuni Nederland B.V',
+    'Walkers Snacks Distribution Ltd',
+    'Wincanton (J SAINSBURY PLC)',
+    'Yankee Candle Co (Europe) LTD',
+    'Yankee Candle Co - DE',
+    'Zeitfracht Medien GmbH',
+    'Danone Deutschland GmbH',
+    'Danone UK Waters',
+    'Danone FR',
+    'Wacker Chemie AG',
+    'Sharp Consumer Electronics Poland sp. z o.o.',
+    'Cargill Poland Sp. z o.o.',
+    'Nitto Advanced Film Gronau GmbH',
+    'Cargill S.L.U.',
+    'Coca-Cola Europacific Partners Deutschland GmbH',
+    'Bio Springer',
     'La Palette Rouge Iberica s.a. succ.le in Italia',
-    'COLGATE PALMOLIVE EUROPE', 'Hisense UK', 'ECOSCOOTING DELIVERY SL',
-    'EDT BE SRL (TEMU)', 'Eddie Stobart (Appleton Culina House- Culina Group)',
-    'LOreal Italy', 'Geodis D&E Normandie', 'Hager Electro SAS',
-    'Heineken Deutschland GmbH', 'HarperCollins Publishers Ltd',
-    'Euro Pool System UK Ltd', '3M EMEA GmbH', 'Falken Tyre Europe GmbH',
-    'SACHSENMILCH Leppersdorf GmbH', 'XPO Transport Solutions UK Limited',
-    'La Palette Rouge Iberica Sa', 'LPR - LA PALETTE ROUGE (GB) LTD',
-    'BONDUELLE RE', 'HARIBO Sp. z o.o.', 'Groupe SEB WMF Consumer GmbH',
-    'HOYER GmbH Internationale Fachspedition', 'BLACK & DECKER LIMITED BV',
-    'Cycleon B.v.', 'Wella International Operations Switzerland Sarl',
+    'COLGATE PALMOLIVE EUROPE',
+    'ECOSCOOTING DELIVERY SL',
+    'EDT BE SRL (TEMU)',
+    "L 'Oreal Italy",
+    'Hager Electro SAS',
+    'Heineken Deutschland GmbH',
+    'Euro Pool System UK Ltd',
+    '3M EMEA GmbH',
+    'Falken Tyre Europe GmbH',
+    'SACHSENMILCH Leppersdorf GmbH',
+    'XPO Transport Solutions UK Limited',
+    'La Palette Rouge Iberica Sa',
+    'LPR - LA PALETTE ROUGE (GB) LTD',
+    'BONDUELLE RE',
+    'HARIBO Sp. z o.o.',
+    'Groupe SEB WMF Consumer GmbH',
+    'HOYER GmbH Internationale Fachspedition',
+    'BLACK & DECKER LIMITED BV',
+    'Cycleon B.v.',
+    'Wella International Operations Switzerland Sarl',
+    'INTERFORUM',
+    'Beiersdorf Customer Supply GmbH',
+    'BDSK Handels GmbH & Co.KG',
+    'DGL- Ingram (KSP) ES',
+    'JYSK SE',
+    'Mars Multisales Spain S.L.',
+    'Mars Food Europe CV',
+    'Nestrade SA',
+    'Philips Consumer Lifestyle BV',
+    'Pregis Ltd',
+    'TYRE ECO CHAIN',
+    'Zalando SE',
+    'Tchibo GmbH',
 ]
 
 _STOPWORDS = {
-    'the','and','for','von','van','de','di','du','der','gmbh','bv','sa','ltd','llc','inc','co',
-    'kg','spa','sas','sl','nv','ag','plc','ug','bvba','srl','spzoo'
+    'the', 'and', 'for', 'von', 'van', 'de', 'di', 'du', 'der', 'gmbh', 'bv', 'sa', 'ltd', 'llc', 'inc', 'co',
+    'kg', 'spa', 'sas', 'sl', 'nv', 'ag', 'plc', 'ug', 'bvba', 'srl', 'spzoo'
 }
 
-# ---------------------------
-# ADDED: German umlaut folding + diacritic stripping
-# ---------------------------
 def _de_umlaut_fold(s: str) -> str:
-    """
-    Convert German umlauts to common ASCII spellings.
-    Examples: Mömax -> Moemax, Müller -> Mueller, Straße -> Strasse
-    Also strips other diacritics.
-    """
     if not isinstance(s, str):
         return ""
-
-    # German-specific folding
-    s = (s.replace("Ä", "Ae").replace("Ö", "Oe").replace("Ü", "Ue")
-           .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
-           .replace("ß", "ss"))
-
-    # Remove any remaining diacritics
+    s = (
+        s.replace("Ä", "Ae").replace("Ö", "Oe").replace("Ü", "Ue")
+         .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
+         .replace("ß", "ss")
+    )
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
     return s
 
-# ---------------------------
-# MODIFIED: _normalise uses umlaut folding
-# ---------------------------
 def _normalise(s):
     if not isinstance(s, str):
         return ''
@@ -103,16 +152,13 @@ def _normalise(s):
     s = re.sub(r'\s+', ' ', s)
     return s.strip().lower()
 
-# ---------------------------
-# MODIFIED: _core_tokens uses umlaut folding
-# ---------------------------
 def _core_tokens(s):
     s = _de_umlaut_fold(str(s))
     words = re.sub(r'[^\w\s]', ' ', s).lower().split()
     return frozenset(w for w in words if len(w) > 2 and w not in _STOPWORDS)
 
-_CST_EXACT  = set(s.strip().lower() for s in CST_SHIPPERS)
-_CST_FUZZY  = set(_normalise(s) for s in CST_SHIPPERS)
+_CST_EXACT = set(s.strip().lower() for s in CST_SHIPPERS)
+_CST_FUZZY = set(_normalise(s) for s in CST_SHIPPERS)
 _CST_TOKENS = [_core_tokens(s) for s in CST_SHIPPERS]
 
 def is_cst_shipper(name):
@@ -137,12 +183,12 @@ AMAZON_ALIAS_PATTERN = re.compile(r'^[a-z]{5,8}$')
 FC_PATTERN = re.compile(r'^(?:[A-Z]{3}\d|[A-Z]{4})$')
 
 REQUIRED_COLUMNS = [
-    'Order ID','Source','Shipper','Destination Stop Date and Time',
-    'Destination Stop Facility Name','Creation Date and Time','Created by'
+    'Order ID', 'Source', 'Shipper', 'Destination Stop Date and Time',
+    'Destination Stop Facility Name', 'Creation Date and Time', 'Created by'
 ]
 REQUIRED_COLUMNS_CST = [
-    'Order ID','Source','Shipper','Destination Stop Date and Time',
-    'Creation Date and Time','Created by'
+    'Order ID', 'Source', 'Shipper', 'Destination Stop Date and Time',
+    'Creation Date and Time', 'Created by'
 ]
 
 def is_fc_facility(name):
@@ -266,7 +312,6 @@ def run_cross_reference():
 
 def go_back_one_step():
     cur = int(st.session_state.step or 1)
-    # Special case: if External Orders step (Step 3) was skipped, then Step 4 should go back to Step 2
     if cur == 4 and st.session_state.get("step3_skipped", False):
         st.session_state.step = 2
     else:
@@ -285,19 +330,18 @@ def scroll_to_top():
         height=0
     )
 
-# ---- session state defaults ----
 defaults = {
     'step': 1,
     'df_raw': None,
-    'df_formatted': None,   # output of merged Step 2
-    'df_step4': None,       # FC-bound orders for portal check
+    'df_formatted': None,
+    'df_step4': None,
     'cst_ext': None,
     'non_cst_ext': None,
     'portal_ids': [],
     'cst_final': None,
     'non_cst_final': None,
     'unmatched_count': 0,
-    'step3_skipped': False,  # External Orders step skipped
+    'step3_skipped': False,
     'arrival_ids_ready': False,
     'portal_export_filenames': [],
     'last_step': None,
@@ -306,14 +350,12 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Scroll to top when step changes
 if st.session_state.last_step is None:
     st.session_state.last_step = st.session_state.step
 elif st.session_state.step != st.session_state.last_step:
     scroll_to_top()
     st.session_state.last_step = st.session_state.step
 
-# ---- UI header / progress ----
 st.title('Uncovered Orders Audit')
 st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
 st.divider()
@@ -331,14 +373,13 @@ st.progress(pv, text='Step {} of {}: {}'.format(
 ))
 st.divider()
 
-# ---- Step 1 ----
 if st.session_state.step == 1:
     st.header('Step 1 - Upload SMC Export File')
     st.info('Download the uncovered orders file from SMC TMS (untick LTL, intermodal) export, then upload it here to begin the audit.')
 
     uploaded = st.file_uploader(
         'Upload your SMC uncovered orders export (.xlsx, .xls, or .csv)',
-        type=['xlsx','xls','csv'],
+        type=['xlsx', 'xls', 'csv'],
         key='smc_upload'
     )
 
@@ -357,7 +398,6 @@ if st.session_state.step == 1:
         except Exception as e:
             st.error('Error reading file: {}. Please check the file and try again.'.format(e))
 
-# ---- Step 2 (merged cleanup + classify) ----
 elif st.session_state.step == 2:
     st.header('Step 2 - Data Cleanup and Order Classification')
     st.info(
@@ -372,14 +412,11 @@ elif st.session_state.step == 2:
     df = st.session_state.df_raw.copy()
     initial_count = len(df)
 
-    # Build column map
     cm = {col.strip().lower(): col for col in df.columns}
 
-    # Remove rows where ANY cell equals 'Dummy' (case-insensitive)
     df_str = df.astype(str)
     dummy_mask = df_str.apply(lambda col: col.str.strip().str.lower().eq('dummy'), axis=0).any(axis=1)
 
-    # Remove rows where Shipper contains 'test' (case-insensitive) if Shipper column exists
     shipper_col = cm.get('shipper')
     if shipper_col:
         test_mask = df[shipper_col].astype(str).str.contains('test', case=False, na=False)
@@ -393,14 +430,12 @@ elif st.session_state.step == 2:
     st.markdown(f"- Removed **{removed}** row(s) (Test/Dummy).")
     st.markdown(f"- Remaining: **{len(df)}** (from {initial_count}).")
 
-    # Rename column B to Source
     cols = list(df.columns)
     if len(cols) >= 2:
         old_b = cols[1]
         df = df.rename(columns={old_b: 'Source'})
         st.markdown(f"- Renamed column **{old_b}** to **Source**.")
 
-    # Keep only required columns
     cm2 = {col.strip().lower(): col for col in df.columns}
     missing = [c for c in REQUIRED_COLUMNS if c.lower() not in cm2]
     if missing:
@@ -409,7 +444,6 @@ elif st.session_state.step == 2:
     keep_cols = [cm2[c.lower()] for c in REQUIRED_COLUMNS if c.lower() in cm2]
     df = df[keep_cols].copy()
 
-    # Classify Source using Created by
     cm3 = {col.strip().lower(): col for col in df.columns}
     created_by_col = cm3.get('created by')
     if created_by_col:
@@ -435,7 +469,6 @@ elif st.session_state.step == 2:
             st.session_state.step = 3
             st.rerun()
 
-# ---- Step 3 (was Step 4) ----
 elif st.session_state.step == 3:
     st.header('Step 3 - Process External Orders')
 
@@ -452,7 +485,6 @@ elif st.session_state.step == 3:
     ext = df[df['_is_fc'] == False].copy()
     intr = df[df['_is_fc'] == True].copy()
 
-    # Auto-skip if no external orders
     if ext.empty:
         st.session_state.cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
         st.session_state.non_cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
@@ -472,7 +504,6 @@ elif st.session_state.step == 3:
     cst_ext_raw = ext[ext['_is_cst'] == True].drop(columns=['_is_fc', '_is_cst'])
     non_cst_ext = ext[ext['_is_cst'] == False].drop(columns=['_is_fc', '_is_cst'])
 
-    # CST external orders remove Destination Stop Facility Name
     cst_cols_to_keep = [c for c in cst_ext_raw.columns if c.lower() != 'destination stop facility name']
     cst_ext = cst_ext_raw[cst_cols_to_keep].copy()
 
@@ -529,7 +560,6 @@ elif st.session_state.step == 3:
             st.session_state.step = 4
             st.rerun()
 
-# ---- Step 4 (was Step 5) ----
 elif st.session_state.step == 4:
     st.header('Step 4 - Unified Portal ISA Check')
 
@@ -712,7 +742,6 @@ elif st.session_state.step == 4:
     if run_clicked:
         run_cross_reference()
 
-# ---- Step 5 (was Step 6) ----
 elif st.session_state.step == 5:
     st.header('Audit Complete - Final Results')
     st.balloons()
