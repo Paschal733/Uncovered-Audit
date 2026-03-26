@@ -9,7 +9,7 @@ import unicodedata
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
 CST_SHIPPERS = [
-    'Amazon Business',
+    'Amazon Business','AEG Electrolux Hausgeräte GmbH',
     'Anheuser-Busch InBev Deutschland GmbH & Co KG',
     'ARTSANA S.P.A.',
     'Brita France',
