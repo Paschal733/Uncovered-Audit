@@ -171,22 +171,6 @@ AMAZON_ALIAS_PATTERN = re.compile(r'^[a-z]{5,8}$')
 FC_PATTERN = re.compile(r'^(?:[A-Z]{3}\d|[A-Z]{4})$')
 
 
-def sync_audit_from_query_params():
-    audit = st.query_params.get("audit", "home")
-    if audit in ["home", "uncovered"]:
-        st.session_state.active_audit = audit
-    else:
-        st.session_state.active_audit = "home"
-
-
-def set_audit_query_param(audit_name: str):
-    st.query_params["audit"] = audit_name
-
-
-def clear_audit_query_param():
-    st.query_params["audit"] = "home"
-
-
 def _de_umlaut_fold(s: str) -> str:
     if not isinstance(s, str):
         return ""
@@ -696,7 +680,6 @@ def scroll_to_top():
 
 
 def go_to_audit_hub():
-    clear_audit_query_param()
     st.session_state.active_audit = "home"
     reset_keys = [
         'step', 'df_raw', 'df_formatted', 'df_step4', 'cst_ext', 'non_cst_ext',
@@ -710,6 +693,12 @@ def go_to_audit_hub():
     st.rerun()
 
 
+def open_uncovered_audit():
+    st.session_state.active_audit = "uncovered"
+    st.session_state.step = 1
+    st.rerun()
+
+
 def inject_home_page_styles():
     st.markdown(
         """
@@ -720,26 +709,20 @@ def inject_home_page_styles():
 
         .stApp {
             background:
-                radial-gradient(circle at 18% 22%, rgba(255,255,255,0.035) 0%, transparent 22%),
-                radial-gradient(circle at 72% 35%, rgba(255,255,255,0.025) 0%, transparent 18%),
-                radial-gradient(circle at 58% 78%, rgba(255,255,255,0.018) 0%, transparent 16%),
-                linear-gradient(135deg, rgba(255,255,255,0.035) 0%, transparent 22%, transparent 100%),
-                linear-gradient(160deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.012) 18%, transparent 36%),
-                linear-gradient(115deg, rgba(255,255,255,0.028) 8%, transparent 24%, transparent 100%),
-                linear-gradient(180deg, #05070b 0%, #06080d 34%, #04060a 100%);
+                radial-gradient(circle at top center, rgba(56, 189, 248, 0.10), transparent 28%),
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.10), transparent 18%),
+                radial-gradient(circle at 80% 15%, rgba(14, 165, 233, 0.08), transparent 20%),
+                linear-gradient(180deg, #0b1220 0%, #0a0f18 100%);
             color: #e5eefc;
             min-height: 100vh;
         }
 
         [data-testid="stAppViewContainer"] {
             background:
-                radial-gradient(circle at 18% 22%, rgba(255,255,255,0.035) 0%, transparent 22%),
-                radial-gradient(circle at 72% 35%, rgba(255,255,255,0.025) 0%, transparent 18%),
-                radial-gradient(circle at 58% 78%, rgba(255,255,255,0.018) 0%, transparent 16%),
-                linear-gradient(135deg, rgba(255,255,255,0.035) 0%, transparent 22%, transparent 100%),
-                linear-gradient(160deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.012) 18%, transparent 36%),
-                linear-gradient(115deg, rgba(255,255,255,0.028) 8%, transparent 24%, transparent 100%),
-                linear-gradient(180deg, #05070b 0%, #06080d 34%, #04060a 100%);
+                radial-gradient(circle at top center, rgba(56, 189, 248, 0.10), transparent 28%),
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.10), transparent 18%),
+                radial-gradient(circle at 80% 15%, rgba(14, 165, 233, 0.08), transparent 20%),
+                linear-gradient(180deg, #0b1220 0%, #0a0f18 100%);
             min-height: 100vh;
         }
 
@@ -767,13 +750,13 @@ def inject_home_page_styles():
             line-height: 1.1;
             color: #f8fbff;
             margin-bottom: 0.65rem;
-            text-shadow: 0 2px 14px rgba(0,0,0,0.42);
+            text-shadow: 0 2px 14px rgba(0,0,0,0.35);
         }
 
         .home-hero-subtitle {
             font-size: 1.05rem;
             color: #d3dfef;
-            text-shadow: 0 1px 10px rgba(0,0,0,0.4);
+            text-shadow: 0 1px 10px rgba(0,0,0,0.35);
         }
 
         .home-section-title {
@@ -782,32 +765,18 @@ def inject_home_page_styles():
             color: #f8fbff;
             text-align: center;
             margin: 0.75rem 0 1.25rem 0;
-            text-shadow: 0 1px 10px rgba(0,0,0,0.35);
-        }
-
-        .audit-card-link {
-            display: block;
-            text-decoration: none !important;
-            color: inherit !important;
+            text-shadow: 0 1px 10px rgba(0,0,0,0.3);
         }
 
         .audit-card {
-            border: 1px solid rgba(148, 163, 184, 0.14);
+            border: 1px solid rgba(148, 163, 184, 0.16);
             border-radius: 20px;
             padding: 18px 18px 16px 18px;
             min-height: 132px;
-            background: linear-gradient(180deg, rgba(17, 23, 32, 0.94) 0%, rgba(11, 16, 24, 0.98) 100%);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+            background: linear-gradient(180deg, rgba(20, 28, 40, 0.95) 0%, rgba(15, 23, 33, 0.98) 100%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
             box-sizing: border-box;
             transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-            cursor: pointer;
-        }
-
-        .audit-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(56, 189, 248, 0.38);
-            box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(56, 189, 248, 0.05);
-            background: linear-gradient(180deg, rgba(22, 30, 42, 0.98) 0%, rgba(13, 20, 30, 1) 100%);
         }
 
         .audit-card-top {
@@ -828,7 +797,7 @@ def inject_home_page_styles():
         .audit-card-icon {
             font-size: 1.2rem;
             line-height: 1;
-            filter: drop-shadow(0 0 6px rgba(255,255,255,0.08));
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.18));
         }
 
         .audit-card-title {
@@ -862,20 +831,44 @@ def inject_home_page_styles():
             white-space: nowrap;
         }
 
+        .clickable-card-wrap {
+            position: relative;
+            display: block;
+        }
+
+        .clickable-card-wrap > div.stButton {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+        }
+
+        .clickable-card-wrap > div.stButton button {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 132px !important;
+            opacity: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            cursor: pointer !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .clickable-card-wrap:hover .audit-card {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.45);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(56, 189, 248, 0.08);
+            background: linear-gradient(180deg, rgba(24, 34, 48, 0.98) 0%, rgba(18, 27, 40, 1) 100%);
+        }
+
         div.stButton > button {
             border-radius: 12px !important;
             font-weight: 700 !important;
         }
 
-        div.stButton > button:disabled {
-            background: rgba(255,255,255,0.16) !important;
-            color: #e6edf7 !important;
-            border: 1px solid rgba(230,237,247,0.26) !important;
-            opacity: 1 !important;
-        }
-
         section.main > div.block-container {
-            padding-top: 1.2rem;
+            padding-top: 2.2rem;
             padding-bottom: 2rem;
         }
         </style>
@@ -900,14 +893,13 @@ def render_home_card(icon: str, title: str, status: str, key: str, active: bool)
     """
 
     if active:
-        href = f"?audit={html.escape(key)}"
-        st.markdown(
-            f'<a class="audit-card-link" href="{href}">{card_html}</a>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="clickable-card-wrap">', unsafe_allow_html=True)
+        st.markdown(card_html, unsafe_allow_html=True)
+        if st.button("Open card", key=f"open_{key}", use_container_width=True):
+            open_uncovered_audit()
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.markdown(card_html, unsafe_allow_html=True)
-        st.button("Coming Soon", key=f"coming_{key}", disabled=True, use_container_width=True)
 
 
 def render_audit_hub_home():
@@ -1351,8 +1343,6 @@ def render_uncovered_audit():
 
 if "active_audit" not in st.session_state:
     st.session_state.active_audit = "home"
-
-sync_audit_from_query_params()
 
 if st.session_state.active_audit == "home":
     render_audit_hub_home()
