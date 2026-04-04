@@ -779,6 +779,13 @@ def inject_home_page_styles():
             transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
         }
 
+        .audit-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.45);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(56, 189, 248, 0.08);
+            background: linear-gradient(180deg, rgba(24, 34, 48, 0.98) 0%, rgba(18, 27, 40, 1) 100%);
+        }
+
         .audit-card-top {
             display: flex;
             justify-content: space-between;
@@ -831,40 +838,16 @@ def inject_home_page_styles():
             white-space: nowrap;
         }
 
-        .clickable-card-wrap {
-            position: relative;
-            display: block;
-        }
-
-        .clickable-card-wrap > div.stButton {
-            position: absolute;
-            inset: 0;
-            z-index: 20;
-        }
-
-        .clickable-card-wrap > div.stButton button {
-            width: 100% !important;
-            height: 100% !important;
-            min-height: 132px !important;
-            opacity: 0 !important;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            cursor: pointer !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-
-        .clickable-card-wrap:hover .audit-card {
-            transform: translateY(-4px);
-            border-color: rgba(56, 189, 248, 0.45);
-            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(56, 189, 248, 0.08);
-            background: linear-gradient(180deg, rgba(24, 34, 48, 0.98) 0%, rgba(18, 27, 40, 1) 100%);
-        }
-
         div.stButton > button {
             border-radius: 12px !important;
             font-weight: 700 !important;
+        }
+
+        div.stButton > button:disabled {
+            background: rgba(255,255,255,0.14) !important;
+            color: #f3f7fd !important;
+            border: 1px solid rgba(243,247,253,0.22) !important;
+            opacity: 1 !important;
         }
 
         section.main > div.block-container {
@@ -892,14 +875,13 @@ def render_home_card(icon: str, title: str, status: str, key: str, active: bool)
     </div>
     """
 
+    st.markdown(card_html, unsafe_allow_html=True)
+
     if active:
-        st.markdown('<div class="clickable-card-wrap">', unsafe_allow_html=True)
-        st.markdown(card_html, unsafe_allow_html=True)
-        if st.button("Open card", key=f"open_{key}", use_container_width=True):
+        if st.button("Launch Audit", key=f"open_{key}", type="primary", use_container_width=True):
             open_uncovered_audit()
-        st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.markdown(card_html, unsafe_allow_html=True)
+        st.button("Coming Soon", key=f"coming_{key}", disabled=True, use_container_width=True)
 
 
 def render_audit_hub_home():
