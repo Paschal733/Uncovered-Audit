@@ -5,6 +5,8 @@ import re
 import io
 import math
 import unicodedata
+import html
+import uuid
 
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
@@ -239,6 +241,100 @@ def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
     out = out.fillna("")
     lines = ["\t".join(map(str, row)) for row in out.to_numpy()]
     return "\n".join(lines)
+
+def render_copy_box(label: str, text: str, button_text: str = "Copy", height: int = 180):
+    """
+    Renders a copyable text area with a custom copy button and explicit visual confirmation.
+    """
+    if not text:
+        st.info(f"No content available for {label}.")
+        return
+
+    box_id = f"copy_box_{uuid.uuid4().hex}"
+    btn_id = f"copy_btn_{uuid.uuid4().hex}"
+    msg_id = f"copy_msg_{uuid.uuid4().hex}"
+
+    safe_label = html.escape(label)
+    safe_button_text = html.escape(button_text)
+    safe_text = html.escape(text)
+
+    components.html(
+        f"""
+        <div style="margin-bottom: 0.5rem;">
+            <div style="font-weight: 600; margin-bottom: 0.35rem;">{safe_label}</div>
+
+            <button
+                id="{btn_id}"
+                onclick="
+                    const textarea = document.getElementById('{box_id}');
+                    const msg = document.getElementById('{msg_id}');
+                    const showMessage = (message) => {{
+                        msg.style.display = 'inline';
+                        msg.textContent = message;
+                        setTimeout(() => {{
+                            msg.style.display = 'none';
+                        }}, 1500);
+                    }};
+
+                    const copyWithFallback = () => {{
+                        textarea.focus();
+                        textarea.select();
+                        try {{
+                            const ok = document.execCommand('copy');
+                            if (ok) {{
+                                showMessage('✓ Copied successfully');
+                            }} else {{
+                                showMessage('Copy failed');
+                            }}
+                        }} catch (e) {{
+                            showMessage('Copy failed');
+                        }}
+                    }};
+
+                    if (navigator.clipboard && window.isSecureContext) {{
+                        navigator.clipboard.writeText(textarea.value)
+                            .then(() => showMessage('✓ Copied successfully'))
+                            .catch(() => copyWithFallback());
+                    }} else {{
+                        copyWithFallback();
+                    }}
+                "
+                style="
+                    margin-bottom: 0.5rem;
+                    padding: 0.45rem 0.85rem;
+                    border-radius: 0.5rem;
+                    border: 1px solid #999;
+                    cursor: pointer;
+                    background: #f0f2f6;
+                    font-size: 0.95rem;
+                "
+            >
+                {safe_button_text}
+            </button>
+
+            <span id="{msg_id}" style="display:none; margin-left: 0.6rem; font-weight: 600;"></span>
+
+            <textarea
+                id="{box_id}"
+                readonly
+                style="
+                    width: 100%;
+                    height: {height}px;
+                    font-family: monospace;
+                    font-size: 0.9rem;
+                    white-space: pre;
+                    overflow: auto;
+                    resize: vertical;
+                    padding: 0.75rem;
+                    border-radius: 0.5rem;
+                    border: 1px solid #ccc;
+                    box-sizing: border-box;
+                "
+            >{safe_text}</textarea>
+        </div>
+        """,
+        height=height + 95,
+    )
 
 def _norm_col(s: str) -> str:
     return re.sub(r'[\s_\-]+', '', str(s).strip().lower())
@@ -519,22 +615,32 @@ elif st.session_state.step == 3:
     st.dataframe(reset_index_display(non_cst_ext), use_container_width=True)
 
     st.divider()
-    st.subheader("Copy-ready blocks (one-click copy via copy icon)")
+    st.subheader("Copy-ready blocks")
     cc1, cc2 = st.columns(2)
     with cc1:
         if st.button("Generate copy block: CST External Orders", key="copy_cst_ext"):
             st.session_state['_copy_block_cst_ext'] = make_copy_block(cst_ext, exclude_cols=['Created by'])
         blk = st.session_state.get('_copy_block_cst_ext', "")
         if blk:
-            st.caption("CST External copy block: click the copy icon (top-right of code box)")
-            st.code(blk, language=None)
+            st.caption("CST External copy block")
+            render_copy_box(
+                label="CST External Orders",
+                text=blk,
+                button_text="Copy CST External Orders",
+                height=180
+            )
     with cc2:
         if st.button("Generate copy block: Non-CST External Orders", key="copy_non_cst_ext"):
             st.session_state['_copy_block_non_cst_ext'] = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
         blk2 = st.session_state.get('_copy_block_non_cst_ext', "")
         if blk2:
-            st.caption("Non-CST External copy block: click the copy icon (top-right of code box)")
-            st.code(blk2, language=None)
+            st.caption("Non-CST External copy block")
+            render_copy_box(
+                label="Non-CST External Orders",
+                text=blk2,
+                button_text="Copy Non-CST External Orders",
+                height=180
+            )
 
     st.divider()
     st.warning(
@@ -780,22 +886,32 @@ elif st.session_state.step == 5:
     st.dataframe(reset_index_display(ncf), use_container_width=True)
 
     st.divider()
-    st.subheader("Copy-ready blocks (one-click copy via copy icon)")
+    st.subheader("Copy-ready blocks")
     cc1, cc2 = st.columns(2)
     with cc1:
         if st.button("Generate copy block: CST Final Orders", key="copy_cst_final"):
             st.session_state['_copy_block_cst_final'] = make_copy_block(cf_clean, exclude_cols=['Created by'])
         blk = st.session_state.get('_copy_block_cst_final', "")
         if blk:
-            st.caption("CST Final copy block: click the copy icon (top-right of code box)")
-            st.code(blk, language=None)
+            st.caption("CST Final copy block")
+            render_copy_box(
+                label="CST Final Orders",
+                text=blk,
+                button_text="Copy CST Final Orders",
+                height=180
+            )
     with cc2:
         if st.button("Generate copy block: Scheduling Final Orders", key="copy_non_cst_final"):
             st.session_state['_copy_block_non_cst_final'] = make_copy_block(ncf, exclude_cols=['Created by'])
         blk2 = st.session_state.get('_copy_block_non_cst_final', "")
         if blk2:
-            st.caption("Non-CST Final copy block: click the copy icon (top-right of code box)")
-            st.code(blk2, language=None)
+            st.caption("Non-CST Final copy block")
+            render_copy_box(
+                label="Scheduling Final Orders",
+                text=blk2,
+                button_text="Copy Scheduling Final Orders",
+                height=180
+            )
 
     st.divider()
     st.warning(
