@@ -137,11 +137,11 @@ _STOPWORDS = {
 }
 
 AUDIT_OPTIONS = [
-    ("uncovered", "Uncovered Audit", "Run the uncovered orders audit workflow."),
-    ("infeasible_isa", "Infeasible ISA Audit", "Review infeasible ISA cases. Coming soon."),
-    ("driving_ban", "Driving Ban Audit", "Review orders impacted by driving bans. Coming soon."),
-    ("cancelled_orders", "Cancelled Order’s Audit", "Review cancelled order activity. Coming soon."),
-    ("orphan_vrid", "Orphan VRID Audit", "Review orphan VRID cases. Coming soon."),
+    ("uncovered", "Uncovered Audit", "LIVE"),
+    ("infeasible_isa", "Infeasible ISA Audit", "IN DEVELOPMENT"),
+    ("driving_ban", "Driving Ban Audit", "IN DEVELOPMENT"),
+    ("cancelled_orders", "Cancelled Order's Audit", "IN DEVELOPMENT"),
+    ("orphan_vrid", "Orphan VRID Audit", "IN DEVELOPMENT"),
 ]
 
 def _de_umlaut_fold(s: str) -> str:
@@ -666,21 +666,42 @@ def go_to_audit_hub():
             del st.session_state[key]
     st.rerun()
 
-def render_home_card(title: str, desc: str, key: str, active: bool):
+def render_home_card(title: str, status: str, key: str, active: bool):
+    if status == "LIVE":
+        pill_bg = "rgba(34,197,94,0.18)"
+        pill_border = "#22c55e"
+        pill_text = "#22c55e"
+    else:
+        pill_bg = "rgba(59,130,246,0.18)"
+        pill_border = "#38bdf8"
+        pill_text = "#38bdf8"
+
     st.markdown(
         f"""
         <div style="
-            border: 1px solid rgba(128,128,128,0.25);
-            border-radius: 16px;
-            padding: 18px 18px 14px 18px;
-            min-height: 150px;
+            border: 1px solid rgba(128,128,128,0.22);
+            border-radius: 18px;
+            padding: 18px;
+            min-height: 110px;
             box-sizing: border-box;
         ">
-            <div style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem;">
-                {html.escape(title)}
-            </div>
-            <div style="font-size: 0.95rem; opacity: 0.85; line-height: 1.45;">
-                {html.escape(desc)}
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div style="font-size:1.08rem; font-weight:700; line-height:1.35;">
+                    {html.escape(title)}
+                </div>
+                <div style="
+                    padding: 0.22rem 0.6rem;
+                    border-radius: 999px;
+                    border: 1px solid {pill_border};
+                    background: {pill_bg};
+                    color: {pill_text};
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    white-space: nowrap;
+                    letter-spacing: 0.02em;
+                ">
+                    {html.escape(status)}
+                </div>
             </div>
         </div>
         """,
@@ -688,7 +709,7 @@ def render_home_card(title: str, desc: str, key: str, active: bool):
     )
 
     if active:
-        if st.button(f"Open {title}", key=f"open_{key}", type="primary", use_container_width=True):
+        if st.button("Launch Audit", key=f"open_{key}", type="primary", use_container_width=True):
             st.session_state.active_audit = key
             st.session_state.step = 1
             st.rerun()
@@ -696,18 +717,29 @@ def render_home_card(title: str, desc: str, key: str, active: bool):
         st.button("Coming Soon", key=f"coming_{key}", disabled=True, use_container_width=True)
 
 def render_audit_hub_home():
-    st.title("Audit Hub-AF Scheduling")
-    st.caption("One place to run audit workflows for the AF Scheduling team.")
+    st.markdown(
+        """
+        <div style="text-align:center; padding-top:0.5rem; padding-bottom:1rem;">
+            <div style="font-size:2.3rem; font-weight:800; margin-bottom:0.5rem;">
+                Audit Hub-AF Scheduling
+            </div>
+            <div style="font-size:1.05rem; opacity:0.82;">
+                One place to launch operational audit workflows for the AF Scheduling team
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.divider()
 
     st.subheader("Available Audits")
 
     cols = st.columns(3)
-    for i, (audit_key, audit_title, audit_desc) in enumerate(AUDIT_OPTIONS):
+    for i, (audit_key, audit_title, audit_status) in enumerate(AUDIT_OPTIONS):
         with cols[i % 3]:
             render_home_card(
                 title=audit_title,
-                desc=audit_desc,
+                status=audit_status,
                 key=audit_key,
                 active=(audit_key == "uncovered")
             )
