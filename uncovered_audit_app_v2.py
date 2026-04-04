@@ -137,11 +137,11 @@ _STOPWORDS = {
 }
 
 AUDIT_OPTIONS = [
-    ("uncovered", "Uncovered Audit", "LIVE"),
-    ("infeasible_isa", "Infeasible ISA Audit", "IN DEVELOPMENT"),
-    ("driving_ban", "Driving Ban Audit", "IN DEVELOPMENT"),
-    ("cancelled_orders", "Cancelled Order's Audit", "IN DEVELOPMENT"),
-    ("orphan_vrid", "Orphan VRID Audit", "IN DEVELOPMENT"),
+    ("uncovered", "📦", "Uncovered Audit", "LIVE"),
+    ("infeasible_isa", "🚫", "Infeasible ISA Audit", "IN DEVELOPMENT"),
+    ("driving_ban", "⛔", "Driving Ban Audit", "IN DEVELOPMENT"),
+    ("cancelled_orders", "❌", "Cancelled Order's Audit", "IN DEVELOPMENT"),
+    ("orphan_vrid", "🧩", "Orphan VRID Audit", "IN DEVELOPMENT"),
 ]
 
 def _de_umlaut_fold(s: str) -> str:
@@ -666,42 +666,137 @@ def go_to_audit_hub():
             del st.session_state[key]
     st.rerun()
 
-def render_home_card(title: str, status: str, key: str, active: bool):
-    if status == "LIVE":
-        pill_bg = "rgba(34,197,94,0.18)"
-        pill_border = "#22c55e"
-        pill_text = "#22c55e"
-    else:
-        pill_bg = "rgba(59,130,246,0.18)"
-        pill_border = "#38bdf8"
-        pill_text = "#38bdf8"
+def inject_home_page_styles():
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background:
+                radial-gradient(circle at top center, rgba(56, 189, 248, 0.10), transparent 28%),
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.10), transparent 18%),
+                radial-gradient(circle at 80% 15%, rgba(14, 165, 233, 0.08), transparent 20%),
+                linear-gradient(180deg, #0b1220 0%, #0a0f18 100%);
+            color: #e5eefc;
+        }
+
+        .home-hero {
+            text-align: center;
+            padding: 1.25rem 0 1.75rem 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .home-hero-title {
+            font-size: 2.65rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: #f8fbff;
+            margin-bottom: 0.65rem;
+        }
+
+        .home-hero-subtitle {
+            font-size: 1.05rem;
+            color: #b7c7de;
+        }
+
+        .home-section-title {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: #f8fbff;
+            text-align: center;
+            margin: 0.75rem 0 1.25rem 0;
+        }
+
+        .audit-card {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 20px;
+            padding: 18px 18px 16px 18px;
+            min-height: 132px;
+            background: linear-gradient(180deg, rgba(20, 28, 40, 0.95) 0%, rgba(15, 23, 33, 0.98) 100%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+            box-sizing: border-box;
+        }
+
+        .audit-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 0.85rem;
+        }
+
+        .audit-card-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .audit-card-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .audit-card-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1.35;
+            color: #f8fbff;
+        }
+
+        .audit-pill-live {
+            padding: 0.26rem 0.72rem;
+            border-radius: 999px;
+            border: 1px solid #22c55e;
+            background: rgba(34, 197, 94, 0.16);
+            color: #4ade80;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .audit-pill-dev {
+            padding: 0.26rem 0.72rem;
+            border-radius: 999px;
+            border: 1px solid #38bdf8;
+            background: rgba(56, 189, 248, 0.14);
+            color: #38bdf8;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        div.stButton > button {
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+        }
+
+        div.stButton > button[kind="secondary"] {
+            background-color: rgba(255,255,255,0.04) !important;
+        }
+
+        section.main > div.block-container {
+            padding-top: 2.2rem;
+            padding-bottom: 2rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def render_home_card(icon: str, title: str, status: str, key: str, active: bool):
+    pill_class = "audit-pill-live" if status == "LIVE" else "audit-pill-dev"
 
     st.markdown(
         f"""
-        <div style="
-            border: 1px solid rgba(128,128,128,0.22);
-            border-radius: 18px;
-            padding: 18px;
-            min-height: 110px;
-            box-sizing: border-box;
-        ">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                <div style="font-size:1.08rem; font-weight:700; line-height:1.35;">
-                    {html.escape(title)}
+        <div class="audit-card">
+            <div class="audit-card-top">
+                <div class="audit-card-title-wrap">
+                    <div class="audit-card-icon">{html.escape(icon)}</div>
+                    <div class="audit-card-title">{html.escape(title)}</div>
                 </div>
-                <div style="
-                    padding: 0.22rem 0.6rem;
-                    border-radius: 999px;
-                    border: 1px solid {pill_border};
-                    background: {pill_bg};
-                    color: {pill_text};
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    white-space: nowrap;
-                    letter-spacing: 0.02em;
-                ">
-                    {html.escape(status)}
-                </div>
+                <div class="{pill_class}">{html.escape(status)}</div>
             </div>
         </div>
         """,
@@ -717,27 +812,28 @@ def render_home_card(title: str, status: str, key: str, active: bool):
         st.button("Coming Soon", key=f"coming_{key}", disabled=True, use_container_width=True)
 
 def render_audit_hub_home():
+    inject_home_page_styles()
+
     st.markdown(
         """
-        <div style="text-align:center; padding-top:0.5rem; padding-bottom:1rem;">
-            <div style="font-size:2.3rem; font-weight:800; margin-bottom:0.5rem;">
-                Audit Hub-AF Scheduling
-            </div>
-            <div style="font-size:1.05rem; opacity:0.82;">
+        <div class="home-hero">
+            <div class="home-hero-title">Audit Hub-AF Scheduling</div>
+            <div class="home-hero-subtitle">
                 One place to launch operational audit workflows for the AF Scheduling team
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.divider()
 
-    st.subheader("Available Audits")
+    st.divider()
+    st.markdown('<div class="home-section-title">Available Audits</div>', unsafe_allow_html=True)
 
     cols = st.columns(3)
-    for i, (audit_key, audit_title, audit_status) in enumerate(AUDIT_OPTIONS):
+    for i, (audit_key, audit_icon, audit_title, audit_status) in enumerate(AUDIT_OPTIONS):
         with cols[i % 3]:
             render_home_card(
+                icon=audit_icon,
                 title=audit_title,
                 status=audit_status,
                 key=audit_key,
