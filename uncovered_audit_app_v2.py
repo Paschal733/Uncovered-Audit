@@ -10,6 +10,8 @@ import uuid
 
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
 
+UNIFIED_PORTAL_URL = "https://unified-portal-eu.corp.amazon.com/#/appointment?searchType=PRO&searchCategory=appointment&searchIds=&searchIds=9524366171"
+
 CST_SHIPPERS = [
     'Amazon Business','AEG Electrolux Hausgeräte GmbH',
     'Anheuser-Busch InBev Deutschland GmbH & Co KG',
@@ -342,6 +344,116 @@ def render_table_with_copy(title: str, df: pd.DataFrame, copy_text: str, button_
 
     st.dataframe(reset_index_display(df), use_container_width=True)
 
+def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: str = "Copy Batch", box_height: int = 260):
+    if not text:
+        return
+
+    btn_id = f"portal_copy_btn_{uuid.uuid4().hex}"
+    text_id = f"portal_copy_text_{uuid.uuid4().hex}"
+    safe_label = html.escape(label)
+    safe_subtitle = html.escape(subtitle)
+    safe_text = html.escape(text)
+    safe_button_text = html.escape(button_text)
+
+    components.html(
+        f"""
+        <div style="margin-bottom: 0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.45rem; gap:0.5rem;">
+                <div>
+                    <div style="font-weight:700; font-size:1rem; margin-bottom:0.15rem;">{safe_label}</div>
+                    <div style="font-size:0.95rem;">{safe_subtitle}</div>
+                </div>
+
+                <div style="flex-shrink:0;">
+                    <textarea id="{text_id}" readonly style="position:absolute; left:-9999px; top:-9999px;">{safe_text}</textarea>
+                    <button
+                        id="{btn_id}"
+                        onclick="
+                            const btn = document.getElementById('{btn_id}');
+                            const textarea = document.getElementById('{text_id}');
+                            const originalText = btn.innerText;
+
+                            const showCopied = () => {{
+                                btn.innerText = 'Copied ✓';
+                                btn.style.background = '#d1fae5';
+                                btn.style.border = '1px solid #10b981';
+                                setTimeout(() => {{
+                                    btn.innerText = originalText;
+                                    btn.style.background = '#f0f2f6';
+                                    btn.style.border = '1px solid #999';
+                                }}, 1500);
+                            }};
+
+                            const showFailed = () => {{
+                                btn.innerText = 'Copy failed';
+                                btn.style.background = '#fee2e2';
+                                btn.style.border = '1px solid #ef4444';
+                                setTimeout(() => {{
+                                    btn.innerText = originalText;
+                                    btn.style.background = '#f0f2f6';
+                                    btn.style.border = '1px solid #999';
+                                }}, 1500);
+                            }};
+
+                            const copyWithFallback = () => {{
+                                textarea.focus();
+                                textarea.select();
+                                try {{
+                                    const ok = document.execCommand('copy');
+                                    if (ok) {{
+                                        showCopied();
+                                    }} else {{
+                                        showFailed();
+                                    }}
+                                }} catch (e) {{
+                                    showFailed();
+                                }}
+                            }};
+
+                            if (navigator.clipboard && window.isSecureContext) {{
+                                navigator.clipboard.writeText(textarea.value)
+                                    .then(() => showCopied())
+                                    .catch(() => copyWithFallback());
+                            }} else {{
+                                copyWithFallback();
+                            }}
+                        "
+                        style="
+                            padding: 0.35rem 0.75rem;
+                            border-radius: 0.5rem;
+                            border: 1px solid #999;
+                            cursor: pointer;
+                            background: #f0f2f6;
+                            font-size: 0.88rem;
+                            font-weight: 500;
+                            white-space: nowrap;
+                        "
+                    >
+                        {safe_button_text}
+                    </button>
+                </div>
+            </div>
+
+            <div
+                style="
+                    height: {box_height}px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    background: rgba(250,250,250,0.06);
+                    border-radius: 0.6rem;
+                    padding: 0.9rem 1rem;
+                    box-sizing: border-box;
+                    font-family: monospace;
+                    font-size: 0.95rem;
+                    line-height: 1.45;
+                    white-space: pre;
+                "
+            >{safe_text}</div>
+        </div>
+        """,
+        height=box_height + 95,
+    )
+
 def _norm_col(s: str) -> str:
     return re.sub(r'[\s_\-]+', '', str(s).strip().lower())
 
@@ -362,7 +474,7 @@ def extract_arrival_scheduled_ids_from_unified_portal_csv(df: pd.DataFrame):
     ids = s_search[mask].dropna().astype(str).str.strip().tolist()
     return list(dict.fromkeys([x for x in ids if x]))
 
-def render_wrapped_batches(batch_texts, per_row=3):
+def render_wrapped_batches(batch_texts, per_row=3, box_height=260):
     if not batch_texts:
         return
     per_row = max(1, int(per_row))
@@ -375,8 +487,13 @@ def render_wrapped_batches(batch_texts, per_row=3):
                 break
             b = batch_texts[idx]
             with cols[c]:
-                st.markdown(f"**{b['label']}**  \n{b['subtitle']}")
-                st.code(b["text"], language=None)
+                render_portal_batch_card(
+                    label=b["label"],
+                    subtitle=b["subtitle"],
+                    text=b["text"],
+                    button_text="Copy Batch",
+                    box_height=box_height
+                )
             idx += 1
 
 def run_cross_reference():
@@ -670,6 +787,8 @@ elif st.session_state.step == 4:
     rids = ds4[oic].dropna().astype(str).str.strip().tolist()
     st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
 
+    st.markdown(f"[Open Unified Portal]({UNIFIED_PORTAL_URL})")
+
     batch_size = 50
     total = len(rids)
     batch_count = max(1, math.ceil(total / batch_size))
@@ -678,7 +797,7 @@ elif st.session_state.step == 4:
         if total == 0:
             st.warning("No Order IDs available to copy.")
         else:
-            st.caption("Batches are displayed in a wrapped grid. One-click copy each batch using the copy icon.")
+            st.caption("Batches are displayed in a wrapped grid. Use the copy button on each batch.")
 
             batches = []
             for i in range(batch_count):
@@ -693,17 +812,18 @@ elif st.session_state.step == 4:
                     "text": "\n".join(batch_ids),
                 })
 
-            render_wrapped_batches(batches, per_row=3)
+            render_wrapped_batches(batches, per_row=3, box_height=260)
 
     st.divider()
     st.subheader('Unified Portal Workflow (New)')
     st.markdown(
-        "1. Copy Order IDs above into Unified Portal (in batches of 50).\n"
-        "2. Run the search in Unified Portal.\n"
-        "3. Export / Download the search results as **CSV**.\n"
-        "4. Upload **all CSV files** from each batch below.\n"
-        "5. The tool will automatically extract **Arrival Scheduled** IDs from `searchId`.\n"
-        "6. Once extracted, the **Run Cross-Reference** button will activate."
+        "1. Open Unified Portal using the link above.\n"
+        "2. Copy Order IDs above into Unified Portal (in batches of 50).\n"
+        "3. Run the search in Unified Portal.\n"
+        "4. Export / Download the search results as **CSV**.\n"
+        "5. Upload **all CSV files** from each batch below.\n"
+        "6. The tool will automatically extract **Arrival Scheduled** IDs from `searchId`.\n"
+        "7. Once extracted, the **Run Cross-Reference** button will activate."
     )
 
     st.divider()
