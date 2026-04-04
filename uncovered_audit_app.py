@@ -8,7 +8,7 @@ import unicodedata
 import html
 import uuid
 
-st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
+st.set_page_config(page_title='Audit Hub-AF Scheduling', page_icon='\U0001f69b', layout='wide')
 
 UNIFIED_PORTAL_URL = "https://unified-portal-eu.corp.amazon.com/#/appointment?searchType=PRO&searchCategory=appointment&searchIds=&searchIds=9524366171"
 
@@ -135,6 +135,14 @@ _STOPWORDS = {
     'the', 'and', 'for', 'von', 'van', 'de', 'di', 'du', 'der', 'gmbh', 'bv', 'sa', 'ltd', 'llc', 'inc', 'co',
     'kg', 'spa', 'sas', 'sl', 'nv', 'ag', 'plc', 'ug', 'bvba', 'srl', 'spzoo'
 }
+
+AUDIT_OPTIONS = [
+    ("uncovered", "📦", "Uncovered Audit", "LIVE"),
+    ("infeasible_isa", "🚫", "Infeasible ISA Audit", "IN DEVELOPMENT"),
+    ("driving_ban", "⛔", "Driving Ban Audit", "IN DEVELOPMENT"),
+    ("cancelled_orders", "❌", "Cancelled Order's Audit", "IN DEVELOPMENT"),
+    ("orphan_vrid", "🧩", "Orphan VRID Audit", "IN DEVELOPMENT"),
+]
 
 def _de_umlaut_fold(s: str) -> str:
     if not isinstance(s, str):
@@ -645,401 +653,607 @@ def scroll_to_top():
         height=0
     )
 
-defaults = {
-    'step': 1,
-    'df_raw': None,
-    'df_formatted': None,
-    'df_step4': None,
-    'cst_ext': None,
-    'non_cst_ext': None,
-    'portal_ids': [],
-    'cst_final': None,
-    'non_cst_final': None,
-    'unmatched_count': 0,
-    'step3_skipped': False,
-    'arrival_ids_ready': False,
-    'portal_export_filenames': [],
-    'last_step': None,
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+def go_to_audit_hub():
+    st.session_state.active_audit = "home"
+    reset_keys = [
+        'step', 'df_raw', 'df_formatted', 'df_step4', 'cst_ext', 'non_cst_ext',
+        'portal_ids', 'cst_final', 'non_cst_final', 'unmatched_count',
+        'step3_skipped', 'arrival_ids_ready', 'portal_export_filenames',
+        'last_step', 'smc_upload', 'portal_export_upload_multi', 'manual_arrivals_paste'
+    ]
+    for key in reset_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+    st.rerun()
 
-if st.session_state.last_step is None:
-    st.session_state.last_step = st.session_state.step
-elif st.session_state.step != st.session_state.last_step:
-    scroll_to_top()
-    st.session_state.last_step = st.session_state.step
+def inject_home_page_styles():
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background:
+                radial-gradient(circle at top center, rgba(56, 189, 248, 0.10), transparent 28%),
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.10), transparent 18%),
+                radial-gradient(circle at 80% 15%, rgba(14, 165, 233, 0.08), transparent 20%),
+                linear-gradient(180deg, #0b1220 0%, #0a0f18 100%);
+            color: #e5eefc;
+        }
 
-st.title('Uncovered Orders Audit')
-st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
-st.divider()
+        .home-hero {
+            text-align: center;
+            padding: 1.25rem 0 1.75rem 0;
+            margin-bottom: 0.75rem;
+        }
 
-visible_step_count = len(VISIBLE_STEP_ORDER)
-current_visible_step_number = VISIBLE_STEP_NUMBER.get(st.session_state.step, 1)
-current_visible_step_label = VISIBLE_STEP_LABELS.get(st.session_state.step, VISIBLE_STEP_LABELS[1])
-pv = (current_visible_step_number - 1) / (visible_step_count - 1)
+        .home-hero-title {
+            font-size: 2.65rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: #f8fbff;
+            margin-bottom: 0.65rem;
+        }
 
-st.progress(
-    pv,
-    text='Step {} of {}: {}'.format(
-        current_visible_step_number,
-        visible_step_count,
-        current_visible_step_label.split('. ', 1)[1]
+        .home-hero-subtitle {
+            font-size: 1.05rem;
+            color: #b7c7de;
+        }
+
+        .home-section-title {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: #f8fbff;
+            text-align: center;
+            margin: 0.75rem 0 1.25rem 0;
+        }
+
+        .audit-card {
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 20px;
+            padding: 18px 18px 16px 18px;
+            min-height: 132px;
+            background: linear-gradient(180deg, rgba(20, 28, 40, 0.95) 0%, rgba(15, 23, 33, 0.98) 100%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+            box-sizing: border-box;
+        }
+
+        .audit-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 0.85rem;
+        }
+
+        .audit-card-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .audit-card-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .audit-card-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1.35;
+            color: #f8fbff;
+        }
+
+        .audit-pill-live {
+            padding: 0.26rem 0.72rem;
+            border-radius: 999px;
+            border: 1px solid #22c55e;
+            background: rgba(34, 197, 94, 0.16);
+            color: #4ade80;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        .audit-pill-dev {
+            padding: 0.26rem 0.72rem;
+            border-radius: 999px;
+            border: 1px solid #38bdf8;
+            background: rgba(56, 189, 248, 0.14);
+            color: #38bdf8;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        div.stButton > button {
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+        }
+
+        div.stButton > button[kind="secondary"] {
+            background-color: rgba(255,255,255,0.04) !important;
+        }
+
+        section.main > div.block-container {
+            padding-top: 2.2rem;
+            padding-bottom: 2rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
-)
-st.divider()
 
-if st.session_state.step == 1:
-    st.header('Step 1 - Upload SMC Export File')
-    st.info('Download the uncovered orders file from SMC TMS (untick LTL, intermodal) export, then upload it here to begin the audit.')
+def render_home_card(icon: str, title: str, status: str, key: str, active: bool):
+    pill_class = "audit-pill-live" if status == "LIVE" else "audit-pill-dev"
 
-    uploaded = st.file_uploader(
-        'Upload your SMC uncovered orders export (.xlsx, .xls, or .csv)',
-        type=['xlsx', 'xls', 'csv'],
-        key='smc_upload'
+    st.markdown(
+        f"""
+        <div class="audit-card">
+            <div class="audit-card-top">
+                <div class="audit-card-title-wrap">
+                    <div class="audit-card-icon">{html.escape(icon)}</div>
+                    <div class="audit-card-title">{html.escape(title)}</div>
+                </div>
+                <div class="{pill_class}">{html.escape(status)}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if uploaded is not None:
-        try:
-            df = load_smc_file(uploaded)
-            st.session_state.df_raw = df
-            st.success('File loaded: {} orders, {} columns detected.'.format(len(df), len(df.columns)))
-            st.dataframe(df.head(10), use_container_width=True)
-            st.caption('Showing first 10 of {} rows.'.format(len(df)))
+    if active:
+        if st.button("Launch Audit", key=f"open_{key}", type="primary", use_container_width=True):
+            st.session_state.active_audit = key
+            st.session_state.step = 1
+            st.rerun()
+    else:
+        st.button("Coming Soon", key=f"coming_{key}", disabled=True, use_container_width=True)
 
-            if st.button('Proceed to Step 2 - External Orders', type='primary'):
-                st.session_state.df_formatted = process_step2_backend(df)
-                st.session_state.step = 3
-                st.rerun()
+def render_audit_hub_home():
+    inject_home_page_styles()
 
-        except Exception as e:
-            st.error('Error reading file: {}. Please check the file and try again.'.format(e))
-
-elif st.session_state.step == 3:
-    st.header('Step 2 - Process External Orders')
-
-    df = st.session_state.df_formatted.copy()
-    cm = {col.strip().lower(): col for col in df.columns}
-    fc = cm.get('destination stop facility name')
-    shc = cm.get('shipper')
-
-    if not fc or not shc:
-        st.error("Missing required columns for this step. Ensure the export contains 'Destination Stop Facility Name' and 'Shipper'.")
-        st.stop()
-
-    df['_is_fc'] = df[fc].apply(is_fc_facility)
-    ext = df[df['_is_fc'] == False].copy()
-    intr = df[df['_is_fc'] == True].copy()
-
-    if ext.empty:
-        st.session_state.cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
-        st.session_state.non_cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
-        st.session_state.df_step4 = intr.drop(columns=['_is_fc'])
-        st.session_state.portal_ids = []
-        st.session_state.arrival_ids_ready = False
-        st.session_state.portal_export_filenames = []
-        st.session_state.step3_skipped = True
-        st.session_state.step = 4
-        st.rerun()
-
-    c1, c2 = st.columns(2)
-    c1.metric('Internal (FC-bound) Orders', len(intr))
-    c2.metric('External (non-FC) Orders', len(ext))
-
-    ext['_is_cst'] = ext[shc].apply(is_cst_shipper)
-    cst_ext_raw = ext[ext['_is_cst'] == True].drop(columns=['_is_fc', '_is_cst'])
-    non_cst_ext = ext[ext['_is_cst'] == False].drop(columns=['_is_fc', '_is_cst'])
-
-    cst_cols_to_keep = [c for c in cst_ext_raw.columns if c.lower() != 'destination stop facility name']
-    cst_ext = cst_ext_raw[cst_cols_to_keep].copy()
-
-    c1, c2 = st.columns(2)
-    c1.metric('CST External Orders', len(cst_ext))
-    c2.metric('Non-CST External Orders', len(non_cst_ext))
+    st.markdown(
+        """
+        <div class="home-hero">
+            <div class="home-hero-title">Audit Hub-AF Scheduling</div>
+            <div class="home-hero-subtitle">
+                One place to launch operational audit workflows for the AF Scheduling team
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.divider()
-    cst_ext_copy = make_copy_block(cst_ext, exclude_cols=['Created by'])
-    render_table_with_copy(
-        title='CST External Orders - copy to CST Task Sheet (Uncovered tab)',
-        df=cst_ext,
-        copy_text=cst_ext_copy,
-        button_text='Copy to CST Sheet'
-    )
+    st.markdown('<div class="home-section-title">Available Audits</div>', unsafe_allow_html=True)
 
-    non_cst_ext_copy = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
-    render_table_with_copy(
-        title='Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
-        df=non_cst_ext,
-        copy_text=non_cst_ext_copy,
-        button_text='Copy to Scheduling Sheet'
-    )
+    cols = st.columns(3)
+    for i, (audit_key, audit_icon, audit_title, audit_status) in enumerate(AUDIT_OPTIONS):
+        with cols[i % 3]:
+            render_home_card(
+                icon=audit_icon,
+                title=audit_title,
+                status=audit_status,
+                key=audit_key,
+                active=(audit_key == "uncovered")
+            )
+
+def render_uncovered_audit():
+    defaults = {
+        'step': 1,
+        'df_raw': None,
+        'df_formatted': None,
+        'df_step4': None,
+        'cst_ext': None,
+        'non_cst_ext': None,
+        'portal_ids': [],
+        'cst_final': None,
+        'non_cst_final': None,
+        'unmatched_count': 0,
+        'step3_skipped': False,
+        'arrival_ids_ready': False,
+        'portal_export_filenames': [],
+        'last_step': None,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+    if st.session_state.last_step is None:
+        st.session_state.last_step = st.session_state.step
+    elif st.session_state.step != st.session_state.last_step:
+        scroll_to_top()
+        st.session_state.last_step = st.session_state.step
+
+    top_left, top_right = st.columns([6, 1])
+    with top_left:
+        st.title('Uncovered Orders Audit')
+        st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
+    with top_right:
+        st.write("")
+        st.write("")
+        if st.button("Back to Audit Hub"):
+            go_to_audit_hub()
 
     st.divider()
-    st.warning(
-        "ACTION REQUIRED\n"
-        "1. Copy CST External Orders to the CST Task Sheet (Uncovered tab).\n"
-        "2. Copy Non-CST External Orders to the AF Scheduling Daily Task Workbook (Uncovered tab).\n"
-        "3. Click Done below once you have completed this step."
-    )
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button('Back a step'):
-            go_back_one_step()
-    with c2:
-        if st.button('Done - Proceed to Step 3', type='primary'):
-            st.session_state.cst_ext = cst_ext
-            st.session_state.non_cst_ext = non_cst_ext
+    visible_step_count = len(VISIBLE_STEP_ORDER)
+    current_visible_step_number = VISIBLE_STEP_NUMBER.get(st.session_state.step, 1)
+    current_visible_step_label = VISIBLE_STEP_LABELS.get(st.session_state.step, VISIBLE_STEP_LABELS[1])
+    pv = (current_visible_step_number - 1) / (visible_step_count - 1)
+
+    st.progress(
+        pv,
+        text='Step {} of {}: {}'.format(
+            current_visible_step_number,
+            visible_step_count,
+            current_visible_step_label.split('. ', 1)[1]
+        )
+    )
+    st.divider()
+
+    if st.session_state.step == 1:
+        st.header('Step 1 - Upload SMC Export File')
+        st.info('Download the uncovered orders file from SMC TMS (untick LTL, intermodal) export, then upload it here to begin the audit.')
+
+        uploaded = st.file_uploader(
+            'Upload your SMC uncovered orders export (.xlsx, .xls, or .csv)',
+            type=['xlsx', 'xls', 'csv'],
+            key='smc_upload'
+        )
+
+        if uploaded is not None:
+            try:
+                df = load_smc_file(uploaded)
+                st.session_state.df_raw = df
+                st.success('File loaded: {} orders, {} columns detected.'.format(len(df), len(df.columns)))
+                st.dataframe(df.head(10), use_container_width=True)
+                st.caption('Showing first 10 of {} rows.'.format(len(df)))
+
+                if st.button('Proceed to Step 2 - External Orders', type='primary'):
+                    st.session_state.df_formatted = process_step2_backend(df)
+                    st.session_state.step = 3
+                    st.rerun()
+
+            except Exception as e:
+                st.error('Error reading file: {}. Please check the file and try again.'.format(e))
+
+    elif st.session_state.step == 3:
+        st.header('Step 2 - Process External Orders')
+
+        df = st.session_state.df_formatted.copy()
+        cm = {col.strip().lower(): col for col in df.columns}
+        fc = cm.get('destination stop facility name')
+        shc = cm.get('shipper')
+
+        if not fc or not shc:
+            st.error("Missing required columns for this step. Ensure the export contains 'Destination Stop Facility Name' and 'Shipper'.")
+            st.stop()
+
+        df['_is_fc'] = df[fc].apply(is_fc_facility)
+        ext = df[df['_is_fc'] == False].copy()
+        intr = df[df['_is_fc'] == True].copy()
+
+        if ext.empty:
+            st.session_state.cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
+            st.session_state.non_cst_ext = pd.DataFrame(columns=REQUIRED_COLUMNS)
             st.session_state.df_step4 = intr.drop(columns=['_is_fc'])
             st.session_state.portal_ids = []
             st.session_state.arrival_ids_ready = False
             st.session_state.portal_export_filenames = []
-            st.session_state.step3_skipped = False
+            st.session_state.step3_skipped = True
             st.session_state.step = 4
             st.rerun()
 
-elif st.session_state.step == 4:
-    st.header('Step 3 - Unified Portal ISA Check')
+        c1, c2 = st.columns(2)
+        c1.metric('Internal (FC-bound) Orders', len(intr))
+        c2.metric('External (non-FC) Orders', len(ext))
 
-    if st.session_state.step3_skipped:
-        st.info("External Orders = 0, so the tool skipped straight to Portal Check.")
+        ext['_is_cst'] = ext[shc].apply(is_cst_shipper)
+        cst_ext_raw = ext[ext['_is_cst'] == True].drop(columns=['_is_fc', '_is_cst'])
+        non_cst_ext = ext[ext['_is_cst'] == False].drop(columns=['_is_fc', '_is_cst'])
 
-    ds4 = st.session_state.df_step4
-    cm = {col.strip().lower(): col for col in ds4.columns}
-    oic = cm.get('order id')
-    if not oic:
-        st.error("Missing 'Order ID' column for Portal Check.")
-        st.stop()
+        cst_cols_to_keep = [c for c in cst_ext_raw.columns if c.lower() != 'destination stop facility name']
+        cst_ext = cst_ext_raw[cst_cols_to_keep].copy()
 
-    rids = ds4[oic].dropna().astype(str).str.strip().tolist()
-    st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
+        c1, c2 = st.columns(2)
+        c1.metric('CST External Orders', len(cst_ext))
+        c2.metric('Non-CST External Orders', len(non_cst_ext))
 
-    render_portal_link(UNIFIED_PORTAL_URL)
-
-    batch_size = 50
-    total = len(rids)
-    batch_count = max(1, math.ceil(total / batch_size))
-
-    with st.expander('View / Copy Order IDs (copy-paste into Unified Portal)'):
-        if total == 0:
-            st.warning("No Order IDs available to copy.")
-        else:
-            st.caption("Batches are displayed in a wrapped grid. Use the copy button on each batch.")
-
-            batches = []
-            for i in range(batch_count):
-                start = i * batch_size
-                end = min(start + batch_size, total)
-                batch_ids = rids[start:end]
-                if not batch_ids:
-                    continue
-                batches.append({
-                    "label": f"Batch {i+1}",
-                    "subtitle": f"{start+1}–{end} of {total}",
-                    "text": "\n".join(batch_ids),
-                })
-
-            render_wrapped_batches(batches, per_row=6, box_height=260)
-
-    st.divider()
-    st.subheader('Upload Unified Portal Results CSV(s)')
-
-    if st.button("Reset Portal Inputs", key="reset_step4"):
-        st.session_state.portal_ids = []
-        st.session_state.arrival_ids_ready = False
-        st.session_state.portal_export_filenames = []
-        if 'portal_export_upload_multi' in st.session_state:
-            del st.session_state['portal_export_upload_multi']
-        if 'manual_arrivals_paste' in st.session_state:
-            del st.session_state['manual_arrivals_paste']
-        st.rerun()
-
-    method = st.radio(
-        "How do you want to provide Unified Portal results?",
-        ["Upload Unified Portal CSV export(s) (recommended)", "Paste Arrival Scheduled Order IDs manually (fallback)"],
-        horizontal=True
-    )
-
-    if method.startswith("Upload"):
-        portal_csvs = st.file_uploader(
-            "Upload Unified Portal export CSV file(s). You can upload multiple files (one per 50-ID search batch). "
-            "Each CSV must contain columns: searchId and appointmentStatus.",
-            type=['csv'],
-            accept_multiple_files=True,
-            key='portal_export_upload_multi'
+        st.divider()
+        cst_ext_copy = make_copy_block(cst_ext, exclude_cols=['Created by'])
+        render_table_with_copy(
+            title='CST External Orders - copy to CST Task Sheet (Uncovered tab)',
+            df=cst_ext,
+            copy_text=cst_ext_copy,
+            button_text='Copy to CST Sheet'
         )
 
-        if portal_csvs:
-            all_arrival_ids = []
-            files_ok = 0
-            files_missing_cols = 0
-            files_read_error = 0
-            zero_arrivals = 0
-            filenames = []
+        non_cst_ext_copy = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
+        render_table_with_copy(
+            title='Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
+            df=non_cst_ext,
+            copy_text=non_cst_ext_copy,
+            button_text='Copy to Scheduling Sheet'
+        )
 
-            for f in portal_csvs:
-                filenames.append(getattr(f, "name", "unknown.csv"))
-                try:
-                    raw = f.read()
-                    pdf = pd.read_csv(io.BytesIO(raw), dtype=str)
+        st.divider()
+        st.warning(
+            "ACTION REQUIRED\n"
+            "1. Copy CST External Orders to the CST Task Sheet (Uncovered tab).\n"
+            "2. Copy Non-CST External Orders to the AF Scheduling Daily Task Workbook (Uncovered tab).\n"
+            "3. Click Done below once you have completed this step."
+        )
 
-                    arrival_ids = extract_arrival_scheduled_ids_from_unified_portal_csv(pdf)
-                    if arrival_ids is None:
-                        files_missing_cols += 1
-                        continue
-
-                    files_ok += 1
-                    if len(arrival_ids) == 0:
-                        zero_arrivals += 1
-                    else:
-                        all_arrival_ids.extend(arrival_ids)
-
-                except Exception:
-                    files_read_error += 1
-
-            all_arrival_ids = list(dict.fromkeys([x for x in all_arrival_ids if x]))
-
-            if files_missing_cols > 0:
-                st.error(
-                    f"{files_missing_cols} file(s) did not contain required columns "
-                    f"('searchId' and 'appointmentStatus')."
-                )
-            if files_read_error > 0:
-                st.error(f"{files_read_error} file(s) could not be read as CSV.")
-
-            st.info(
-                f"Files uploaded: {len(portal_csvs)} | Parsed OK: {files_ok} | "
-                f"0 arrivals: {zero_arrivals} | Arrival Scheduled IDs extracted: {len(all_arrival_ids)}"
-            )
-
-            with st.expander("Show uploaded filenames"):
-                st.write(filenames)
-
-            if len(all_arrival_ids) == 0:
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button('Back a step'):
+                go_back_one_step()
+        with c2:
+            if st.button('Done - Proceed to Step 3', type='primary'):
+                st.session_state.cst_ext = cst_ext
+                st.session_state.non_cst_ext = non_cst_ext
+                st.session_state.df_step4 = intr.drop(columns=['_is_fc'])
                 st.session_state.portal_ids = []
                 st.session_state.arrival_ids_ready = False
-                st.session_state.portal_export_filenames = filenames
-                st.warning("No 'Arrival Scheduled' rows were found across the uploaded file(s).")
-            else:
-                st.session_state.portal_ids = all_arrival_ids
-                st.session_state.arrival_ids_ready = True
-                st.session_state.portal_export_filenames = filenames
-                st.success(
-                    f"Done. Combined {len(all_arrival_ids)} unique 'Arrival Scheduled' Order IDs "
-                    f"from {files_ok} CSV file(s)."
-                )
-                with st.expander("Preview extracted Arrival Scheduled IDs"):
-                    st.caption("One-click copy via copy icon (top-right of code box)")
-                    st.code("\n".join(all_arrival_ids), language=None)
-
-    else:
-        pasted = st.text_area(
-            "Paste (Arrival Scheduled) Order IDs here:",
-            height=200,
-            key="manual_arrivals_paste"
-        )
-        if pasted.strip():
-            ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
-            ids = list(dict.fromkeys(ri))
-            if ids:
-                st.session_state.portal_ids = ids
-                st.session_state.arrival_ids_ready = True
                 st.session_state.portal_export_filenames = []
-                st.success(f"{len(ids)} unique Order IDs entered.")
-                with st.expander("Preview / Copy pasted IDs"):
-                    st.caption("One-click copy via copy icon (top-right of code box)")
-                    st.code("\n".join(ids), language=None)
-        else:
-            st.info("Paste IDs to enable the cross-reference button.")
+                st.session_state.step3_skipped = False
+                st.session_state.step = 4
+                st.rerun()
 
-    st.divider()
-    ready = bool(st.session_state.arrival_ids_ready and len(st.session_state.portal_ids) > 0)
-    if ready:
-        st.info("Arrival Scheduled Order IDs are ready. You can now run the final cross-reference.")
+    elif st.session_state.step == 4:
+        st.header('Step 3 - Unified Portal ISA Check')
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button('Back a step'):
-            go_back_one_step()
-    with c2:
-        run_clicked = st.button(
-            'Run Cross-Reference and Produce Final Results',
-            type='primary',
-            disabled=(not ready)
+        if st.session_state.step3_skipped:
+            st.info("External Orders = 0, so the tool skipped straight to Portal Check.")
+
+        ds4 = st.session_state.df_step4
+        cm = {col.strip().lower(): col for col in ds4.columns}
+        oic = cm.get('order id')
+        if not oic:
+            st.error("Missing 'Order ID' column for Portal Check.")
+            st.stop()
+
+        rids = ds4[oic].dropna().astype(str).str.strip().tolist()
+        st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
+
+        render_portal_link(UNIFIED_PORTAL_URL)
+
+        batch_size = 50
+        total = len(rids)
+        batch_count = max(1, math.ceil(total / batch_size))
+
+        with st.expander('View / Copy Order IDs (copy-paste into Unified Portal)'):
+            if total == 0:
+                st.warning("No Order IDs available to copy.")
+            else:
+                st.caption("Batches are displayed in a wrapped grid. Use the copy button on each batch.")
+
+                batches = []
+                for i in range(batch_count):
+                    start = i * batch_size
+                    end = min(start + batch_size, total)
+                    batch_ids = rids[start:end]
+                    if not batch_ids:
+                        continue
+                    batches.append({
+                        "label": f"Batch {i+1}",
+                        "subtitle": f"{start+1}–{end} of {total}",
+                        "text": "\n".join(batch_ids),
+                    })
+
+                render_wrapped_batches(batches, per_row=6, box_height=260)
+
+        st.divider()
+        st.subheader('Upload Unified Portal Results CSV(s)')
+
+        if st.button("Reset Portal Inputs", key="reset_step4"):
+            st.session_state.portal_ids = []
+            st.session_state.arrival_ids_ready = False
+            st.session_state.portal_export_filenames = []
+            if 'portal_export_upload_multi' in st.session_state:
+                del st.session_state['portal_export_upload_multi']
+            if 'manual_arrivals_paste' in st.session_state:
+                del st.session_state['manual_arrivals_paste']
+            st.rerun()
+
+        method = st.radio(
+            "How do you want to provide Unified Portal results?",
+            ["Upload Unified Portal CSV export(s) (recommended)", "Paste Arrival Scheduled Order IDs manually (fallback)"],
+            horizontal=True
         )
 
-    if run_clicked:
-        run_cross_reference()
+        if method.startswith("Upload"):
+            portal_csvs = st.file_uploader(
+                "Upload Unified Portal export CSV file(s). You can upload multiple files (one per 50-ID search batch). "
+                "Each CSV must contain columns: searchId and appointmentStatus.",
+                type=['csv'],
+                accept_multiple_files=True,
+                key='portal_export_upload_multi'
+            )
 
-elif st.session_state.step == 5:
-    st.header('Step 4 - Audit Complete')
-    st.balloons()
+            if portal_csvs:
+                all_arrival_ids = []
+                files_ok = 0
+                files_missing_cols = 0
+                files_read_error = 0
+                zero_arrivals = 0
+                filenames = []
 
-    cf = st.session_state.cst_final if st.session_state.cst_final is not None else pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
-    ncf = st.session_state.non_cst_final if st.session_state.non_cst_final is not None else pd.DataFrame(columns=REQUIRED_COLUMNS)
-    uc = int(st.session_state.unmatched_count or 0)
+                for f in portal_csvs:
+                    filenames.append(getattr(f, "name", "unknown.csv"))
+                    try:
+                        raw = f.read()
+                        pdf = pd.read_csv(io.BytesIO(raw), dtype=str)
 
-    cf_clean = drop_if_exists(cf, 'Destination Stop Facility Name')
+                        arrival_ids = extract_arrival_scheduled_ids_from_unified_portal_csv(pdf)
+                        if arrival_ids is None:
+                            files_missing_cols += 1
+                            continue
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric('Matched (Arrival Scheduled)', len(cf) + len(ncf))
-    c2.metric('CST Orders', len(cf))
-    c3.metric('Non-CST Orders', len(ncf))
+                        files_ok += 1
+                        if len(arrival_ids) == 0:
+                            zero_arrivals += 1
+                        else:
+                            all_arrival_ids.extend(arrival_ids)
 
-    if uc > 0:
-        st.info('{} FC-bound order(s) were not found in the Unified Portal and have been excluded.'.format(uc))
+                    except Exception:
+                        files_read_error += 1
 
-    fb = to_excel_bytes({
-        'CST Orders': cf_clean if not cf_clean.empty else pd.DataFrame(columns=[c for c in REQUIRED_COLUMNS_CST if c != 'Created by']),
-        'Non-CST Orders': ncf if not ncf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)
-    })
+                all_arrival_ids = list(dict.fromkeys([x for x in all_arrival_ids if x]))
 
-    st.download_button(
-        label='Download Final_Results.xlsx',
-        data=fb,
-        file_name='Final_Results.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+                if files_missing_cols > 0:
+                    st.error(
+                        f"{files_missing_cols} file(s) did not contain required columns "
+                        f"('searchId' and 'appointmentStatus')."
+                    )
+                if files_read_error > 0:
+                    st.error(f"{files_read_error} file(s) could not be read as CSV.")
 
-    st.divider()
-    cf_copy = make_copy_block(cf_clean, exclude_cols=['Created by'])
-    render_table_with_copy(
-        title='CST Orders - copy to CST Task Sheet (Uncovered tab)',
-        df=cf_clean,
-        copy_text=cf_copy,
-        button_text='Copy to CST Sheet'
-    )
+                st.info(
+                    f"Files uploaded: {len(portal_csvs)} | Parsed OK: {files_ok} | "
+                    f"0 arrivals: {zero_arrivals} | Arrival Scheduled IDs extracted: {len(all_arrival_ids)}"
+                )
 
-    ncf_copy = make_copy_block(ncf, exclude_cols=['Created by'])
-    render_table_with_copy(
-        title='Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
-        df=ncf,
-        copy_text=ncf_copy,
-        button_text='Copy to Scheduling Sheet'
-    )
+                with st.expander("Show uploaded filenames"):
+                    st.write(filenames)
 
-    st.divider()
-    st.warning(
-        "FINAL ACTION REQUIRED\n"
-        "1. Download the file above.\n"
-        "2. Copy CST Orders sheet to the CST Task Sheet (Uncovered tab).\n"
-        "3. Copy Non-CST Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).\n"
-        "Audit complete!"
-    )
+                if len(all_arrival_ids) == 0:
+                    st.session_state.portal_ids = []
+                    st.session_state.arrival_ids_ready = False
+                    st.session_state.portal_export_filenames = filenames
+                    st.warning("No 'Arrival Scheduled' rows were found across the uploaded file(s).")
+                else:
+                    st.session_state.portal_ids = all_arrival_ids
+                    st.session_state.arrival_ids_ready = True
+                    st.session_state.portal_export_filenames = filenames
+                    st.success(
+                        f"Done. Combined {len(all_arrival_ids)} unique 'Arrival Scheduled' Order IDs "
+                        f"from {files_ok} CSV file(s)."
+                    )
+                    with st.expander("Preview extracted Arrival Scheduled IDs"):
+                        st.caption("One-click copy via copy icon (top-right of code box)")
+                        st.code("\n".join(all_arrival_ids), language=None)
 
-    st.divider()
-    if st.button('Start a New Audit', type='primary'):
-        keys_to_clear = list(defaults.keys()) + [
-            'smc_upload',
-            'portal_export_upload_multi',
-            'manual_arrivals_paste',
-        ]
-        for k in keys_to_clear:
-            if k in st.session_state:
-                del st.session_state[k]
-        for k, v in defaults.items():
-            if k not in st.session_state:
-                st.session_state[k] = v
-        st.session_state.step = 1
-        st.rerun()
+        else:
+            pasted = st.text_area(
+                "Paste (Arrival Scheduled) Order IDs here:",
+                height=200,
+                key="manual_arrivals_paste"
+            )
+            if pasted.strip():
+                ri = [l.strip() for l in pasted.strip().splitlines() if l.strip()]
+                ids = list(dict.fromkeys(ri))
+                if ids:
+                    st.session_state.portal_ids = ids
+                    st.session_state.arrival_ids_ready = True
+                    st.session_state.portal_export_filenames = []
+                    st.success(f"{len(ids)} unique Order IDs entered.")
+                    with st.expander("Preview / Copy pasted IDs"):
+                        st.caption("One-click copy via copy icon (top-right of code box)")
+                        st.code("\n".join(ids), language=None)
+            else:
+                st.info("Paste IDs to enable the cross-reference button.")
+
+        st.divider()
+        ready = bool(st.session_state.arrival_ids_ready and len(st.session_state.portal_ids) > 0)
+        if ready:
+            st.info("Arrival Scheduled Order IDs are ready. You can now run the final cross-reference.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button('Back a step'):
+                go_back_one_step()
+        with c2:
+            run_clicked = st.button(
+                'Run Cross-Reference and Produce Final Results',
+                type='primary',
+                disabled=(not ready)
+            )
+
+        if run_clicked:
+            run_cross_reference()
+
+    elif st.session_state.step == 5:
+        st.header('Step 4 - Audit Complete')
+        st.balloons()
+
+        cf = st.session_state.cst_final if st.session_state.cst_final is not None else pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
+        ncf = st.session_state.non_cst_final if st.session_state.non_cst_final is not None else pd.DataFrame(columns=REQUIRED_COLUMNS)
+        uc = int(st.session_state.unmatched_count or 0)
+
+        cf_clean = drop_if_exists(cf, 'Destination Stop Facility Name')
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric('Matched (Arrival Scheduled)', len(cf) + len(ncf))
+        c2.metric('CST Orders', len(cf))
+        c3.metric('Non-CST Orders', len(ncf))
+
+        if uc > 0:
+            st.info('{} FC-bound order(s) were not found in the Unified Portal and have been excluded.'.format(uc))
+
+        fb = to_excel_bytes({
+            'CST Orders': cf_clean if not cf_clean.empty else pd.DataFrame(columns=[c for c in REQUIRED_COLUMNS_CST if c != 'Created by']),
+            'Non-CST Orders': ncf if not ncf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)
+        })
+
+        st.download_button(
+            label='Download Final_Results.xlsx',
+            data=fb,
+            file_name='Final_Results.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+        st.divider()
+        cf_copy = make_copy_block(cf_clean, exclude_cols=['Created by'])
+        render_table_with_copy(
+            title='CST Orders - copy to CST Task Sheet (Uncovered tab)',
+            df=cf_clean,
+            copy_text=cf_copy,
+            button_text='Copy to CST Sheet'
+        )
+
+        ncf_copy = make_copy_block(ncf, exclude_cols=['Created by'])
+        render_table_with_copy(
+            title='Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
+            df=ncf,
+            copy_text=ncf_copy,
+            button_text='Copy to Scheduling Sheet'
+        )
+
+        st.divider()
+        st.warning(
+            "FINAL ACTION REQUIRED\n"
+            "1. Download the file above.\n"
+            "2. Copy CST Orders sheet to the CST Task Sheet (Uncovered tab).\n"
+            "3. Copy Non-CST Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).\n"
+            "Audit complete!"
+        )
+
+        st.divider()
+        if st.button('Start a New Audit', type='primary'):
+            keys_to_clear = list(defaults.keys()) + [
+                'smc_upload',
+                'portal_export_upload_multi',
+                'manual_arrivals_paste',
+            ]
+            for k in keys_to_clear:
+                if k in st.session_state:
+                    del st.session_state[k]
+            for k, v in defaults.items():
+                if k not in st.session_state:
+                    st.session_state[k] = v
+            st.session_state.step = 1
+            st.rerun()
+
+if "active_audit" not in st.session_state:
+    st.session_state.active_audit = "home"
+
+if st.session_state.active_audit == "home":
+    render_audit_hub_home()
+elif st.session_state.active_audit == "uncovered":
+    render_uncovered_audit()
+else:
+    render_audit_hub_home()
