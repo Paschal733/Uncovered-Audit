@@ -245,14 +245,6 @@ def load_smc_file(f):
     return pd.read_excel(io.BytesIO(raw), dtype=str, engine='openpyxl')
 
 
-def to_excel_bytes(sheets):
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine='openpyxl') as w:
-        for sn, df in sheets.items():
-            df.to_excel(w, sheet_name=sn, index=False)
-    return buf.getvalue()
-
-
 def reset_index_display(df):
     df = df.copy().reset_index(drop=True)
     df.index = df.index + 1
@@ -890,9 +882,9 @@ def render_audit_hub_home():
     st.markdown(
         """
         <div class="home-hero">
-            <div class="home-hero-title">Audit Hub-AF Scheduling</div>
+            <div class="home-hero-title">AFOPS FTL Scheduling Audit Hub</div>
             <div class="home-hero-subtitle">
-                One place to launch operational audit workflows for the AF Scheduling team
+                A centralised location for all audit automation tools
             </div>
         </div>
         """,
@@ -1268,18 +1260,6 @@ def render_uncovered_audit():
         if uc > 0:
             st.info('{} FC-bound order(s) were not found in the Unified Portal and have been excluded.'.format(uc))
 
-        fb = to_excel_bytes({
-            'CST Orders': cf_clean if not cf_clean.empty else pd.DataFrame(columns=[c for c in REQUIRED_COLUMNS_CST if c != 'Created by']),
-            'Non-CST Orders': ncf if not ncf.empty else pd.DataFrame(columns=REQUIRED_COLUMNS)
-        })
-
-        st.download_button(
-            label='Download Final_Results.xlsx',
-            data=fb,
-            file_name='Final_Results.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-
         st.divider()
         cf_copy = make_copy_block(cf_clean, exclude_cols=['Created by'])
         render_table_with_copy(
@@ -1300,9 +1280,8 @@ def render_uncovered_audit():
         st.divider()
         st.warning(
             "FINAL ACTION REQUIRED\n"
-            "1. Download the file above.\n"
-            "2. Copy CST Orders sheet to the CST Task Sheet (Uncovered tab).\n"
-            "3. Copy Non-CST Orders sheet to the AF Scheduling Daily Task Workbook (Uncovered tab).\n"
+            "1. Copy CST Orders to the CST Task Sheet (Uncovered tab).\n"
+            "2. Copy Non-CST Orders to the AF Scheduling Daily Task Workbook (Uncovered tab).\n"
             "Audit complete!"
         )
 
