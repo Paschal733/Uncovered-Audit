@@ -406,8 +406,8 @@ def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: 
         <div style="margin-bottom: 0.75rem; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem; gap:0.5rem;">
                 <div>
-                    <div style="font-weight:700; font-size:1rem; color:#111827; margin-bottom:0.18rem;">{safe_label}</div>
-                    <div style="font-size:0.95rem; color:#374151;">{safe_subtitle}</div>
+                    <div style="font-weight:700; font-size:1rem; color:#f9fafb; margin-bottom:0.18rem;">{safe_label}</div>
+                    <div style="font-size:0.95rem; color:#d1d5db;">{safe_subtitle}</div>
                 </div>
 
                 <div style="flex-shrink:0;">
@@ -805,18 +805,6 @@ elif st.session_state.step == 4:
                 })
 
             render_wrapped_batches(batches, per_row=3, box_height=260)
-
-    st.divider()
-    st.subheader('Unified Portal Workflow')
-    st.markdown(
-        "1. Open Unified Portal using the button above.\n"
-        "2. Copy Order IDs above into Unified Portal (in batches of 50).\n"
-        "3. Run the search in Unified Portal.\n"
-        "4. Export / Download the search results as **CSV**.\n"
-        "5. Upload **all CSV files** from each batch below.\n"
-        "6. The tool will automatically extract **Arrival Scheduled** IDs from `searchId`.\n"
-        "7. Once extracted, the **Run Cross-Reference** button will activate."
-    )
 
     st.divider()
     st.subheader('Upload Unified Portal Results CSV(s)')
