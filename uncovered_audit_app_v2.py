@@ -344,6 +344,36 @@ def render_table_with_copy(title: str, df: pd.DataFrame, copy_text: str, button_
 
     st.dataframe(reset_index_display(df), use_container_width=True)
 
+def render_centered_portal_link(url: str, label: str = "Open Unified Portal"):
+    safe_url = html.escape(url, quote=True)
+    safe_label = html.escape(label)
+
+    components.html(
+        f"""
+        <div style="display:flex; justify-content:center; margin: 0.35rem 0 0.9rem 0;">
+            <a
+                href="{safe_url}"
+                target="_blank"
+                style="
+                    display:inline-block;
+                    text-decoration:none;
+                    padding: 0.55rem 1rem;
+                    border-radius: 0.6rem;
+                    border: 1px solid #3b82f6;
+                    background: rgba(59,130,246,0.14);
+                    color: #dbeafe;
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    text-align:center;
+                "
+            >
+                {safe_label}
+            </a>
+        </div>
+        """,
+        height=60,
+    )
+
 def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: str = "Copy Batch", box_height: int = 260):
     if not text:
         return
@@ -357,11 +387,11 @@ def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: 
 
     components.html(
         f"""
-        <div style="margin-bottom: 0.75rem;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.45rem; gap:0.5rem;">
+        <div style="margin-bottom: 0.75rem; max-width: 280px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem; gap:0.5rem;">
                 <div>
-                    <div style="font-weight:700; font-size:1rem; margin-bottom:0.15rem;">{safe_label}</div>
-                    <div style="font-size:0.95rem;">{safe_subtitle}</div>
+                    <div style="font-weight:700; font-size:1rem; color:#f8fafc; margin-bottom:0.18rem;">{safe_label}</div>
+                    <div style="font-size:0.95rem; color:#e5e7eb;">{safe_subtitle}</div>
                 </div>
 
                 <div style="flex-shrink:0;">
@@ -419,12 +449,12 @@ def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: 
                             }}
                         "
                         style="
-                            padding: 0.35rem 0.75rem;
+                            padding: 0.3rem 0.65rem;
                             border-radius: 0.5rem;
                             border: 1px solid #999;
                             cursor: pointer;
                             background: #f0f2f6;
-                            font-size: 0.88rem;
+                            font-size: 0.85rem;
                             font-weight: 500;
                             white-space: nowrap;
                         "
@@ -436,17 +466,19 @@ def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: 
 
             <div
                 style="
+                    width: 100%;
                     height: {box_height}px;
                     overflow-y: auto;
-                    overflow-x: auto;
-                    background: rgba(250,250,250,0.06);
-                    border-radius: 0.6rem;
-                    padding: 0.9rem 1rem;
+                    overflow-x: hidden;
+                    background: rgba(255,255,255,0.08);
+                    border-radius: 0.7rem;
+                    padding: 1rem 1rem 0.95rem 1rem;
                     box-sizing: border-box;
                     font-family: monospace;
-                    font-size: 0.95rem;
-                    line-height: 1.45;
+                    font-size: 0.98rem;
+                    line-height: 1.55;
                     white-space: pre;
+                    color: #f8fafc;
                 "
             >{safe_text}</div>
         </div>
@@ -787,7 +819,7 @@ elif st.session_state.step == 4:
     rids = ds4[oic].dropna().astype(str).str.strip().tolist()
     st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
 
-    st.markdown(f"[Open Unified Portal]({UNIFIED_PORTAL_URL})")
+    render_centered_portal_link(UNIFIED_PORTAL_URL, "Open Unified Portal")
 
     batch_size = 50
     total = len(rids)
@@ -817,7 +849,7 @@ elif st.session_state.step == 4:
     st.divider()
     st.subheader('Unified Portal Workflow (New)')
     st.markdown(
-        "1. Open Unified Portal using the link above.\n"
+        "1. Open Unified Portal using the button above.\n"
         "2. Copy Order IDs above into Unified Portal (in batches of 50).\n"
         "3. Run the search in Unified Portal.\n"
         "4. Export / Download the search results as **CSV**.\n"
