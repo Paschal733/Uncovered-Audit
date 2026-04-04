@@ -714,6 +714,14 @@ def inject_home_page_styles():
             background: linear-gradient(180deg, rgba(20, 28, 40, 0.95) 0%, rgba(15, 23, 33, 0.98) 100%);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
             box-sizing: border-box;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .audit-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.45);
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(56, 189, 248, 0.08);
+            background: linear-gradient(180deg, rgba(24, 34, 48, 0.98) 0%, rgba(18, 27, 40, 1) 100%);
         }
 
         .audit-card-top {
@@ -734,6 +742,7 @@ def inject_home_page_styles():
         .audit-card-icon {
             font-size: 1.2rem;
             line-height: 1;
+            filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.18));
         }
 
         .audit-card-title {
