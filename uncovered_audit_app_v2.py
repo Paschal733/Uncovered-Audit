@@ -231,7 +231,8 @@ def drop_if_exists(df, col_name):
         return df.drop(columns=[col_name])
     return df
 
-def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
+@st.cache_data(show_spinner=False)
+def _make_copy_block_cached(df: pd.DataFrame, exclude_cols: tuple[str, ...]) -> str:
     if df is None or df.empty:
         return ""
     out = df.copy()
@@ -241,6 +242,9 @@ def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
     out = out.fillna("")
     lines = ["\t".join(map(str, row)) for row in out.to_numpy()]
     return "\n".join(lines)
+
+def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
+    return _make_copy_block_cached(df, tuple(exclude_cols))
 
 def render_inline_copy_button(text: str, button_text: str = "Copy"):
     if not text:
@@ -333,7 +337,7 @@ def render_table_with_copy(title: str, df: pd.DataFrame, copy_text: str, button_
         st.subheader(title)
 
     with right:
-        if copy_text:
+        if df is not None and not df.empty and copy_text:
             render_inline_copy_button(copy_text, button_text=button_text)
 
     st.dataframe(reset_index_display(df), use_container_width=True)
@@ -615,7 +619,7 @@ elif st.session_state.step == 3:
         title='CST External Orders - copy to CST Task Sheet (Uncovered tab)',
         df=cst_ext,
         copy_text=cst_ext_copy,
-        button_text='Copy CST'
+        button_text='Copy to CST Sheet'
     )
 
     non_cst_ext_copy = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
@@ -623,7 +627,7 @@ elif st.session_state.step == 3:
         title='Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
         df=non_cst_ext,
         copy_text=non_cst_ext_copy,
-        button_text='Copy Non-CST'
+        button_text='Copy to Scheduling Sheet'
     )
 
     st.divider()
@@ -868,7 +872,7 @@ elif st.session_state.step == 5:
         title='CST Orders - copy to CST Task Sheet (Uncovered tab)',
         df=cf_clean,
         copy_text=cf_copy,
-        button_text='Copy CST'
+        button_text='Copy to CST Sheet'
     )
 
     ncf_copy = make_copy_block(ncf, exclude_cols=['Created by'])
@@ -876,7 +880,7 @@ elif st.session_state.step == 5:
         title='Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
         df=ncf,
         copy_text=ncf_copy,
-        button_text='Copy Non-CST'
+        button_text='Copy to Scheduling Sheet'
     )
 
     st.divider()
