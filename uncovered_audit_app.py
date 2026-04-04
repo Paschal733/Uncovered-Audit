@@ -5,8 +5,12 @@ import re
 import io
 import math
 import unicodedata
+import html
+import uuid
 
 st.set_page_config(page_title='Uncovered Audit Automation Tool', page_icon='\U0001f69b', layout='wide')
+
+UNIFIED_PORTAL_URL = "https://unified-portal-eu.corp.amazon.com/#/appointment?searchType=PRO&searchCategory=appointment&searchIds=&searchIds=9524366171"
 
 CST_SHIPPERS = [
     'Amazon Business','AEG Electrolux Hausgeräte GmbH',
@@ -191,6 +195,20 @@ REQUIRED_COLUMNS_CST = [
     'Creation Date and Time', 'Created by'
 ]
 
+VISIBLE_STEP_ORDER = [1, 3, 4, 5]
+VISIBLE_STEP_LABELS = {
+    1: '1. Load File',
+    3: '2. External Orders',
+    4: '3. Portal Check',
+    5: '4. Final Results',
+}
+VISIBLE_STEP_NUMBER = {
+    1: 1,
+    3: 2,
+    4: 3,
+    5: 4,
+}
+
 def is_fc_facility(name):
     if not isinstance(name, str):
         return False
@@ -229,7 +247,8 @@ def drop_if_exists(df, col_name):
         return df.drop(columns=[col_name])
     return df
 
-def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
+@st.cache_data(show_spinner=False)
+def _make_copy_block_cached(df: pd.DataFrame, exclude_cols: tuple[str, ...]) -> str:
     if df is None or df.empty:
         return ""
     out = df.copy()
@@ -239,6 +258,288 @@ def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
     out = out.fillna("")
     lines = ["\t".join(map(str, row)) for row in out.to_numpy()]
     return "\n".join(lines)
+
+def make_copy_block(df: pd.DataFrame, exclude_cols: list[str]) -> str:
+    return _make_copy_block_cached(df, tuple(exclude_cols))
+
+def process_step2_backend(df_raw: pd.DataFrame) -> pd.DataFrame:
+    df = df_raw.copy()
+    cm = {col.strip().lower(): col for col in df.columns}
+
+    df_str = df.astype(str)
+    dummy_mask = df_str.apply(lambda col: col.str.strip().str.lower().eq('dummy'), axis=0).any(axis=1)
+
+    shipper_col = cm.get('shipper')
+    if shipper_col:
+        test_mask = df[shipper_col].astype(str).str.contains('test', case=False, na=False)
+    else:
+        test_mask = pd.Series([False] * len(df), index=df.index)
+
+    remove_mask = dummy_mask | test_mask
+    df = df.loc[~remove_mask].copy()
+
+    cols = list(df.columns)
+    if len(cols) >= 2:
+        old_b = cols[1]
+        df = df.rename(columns={old_b: 'Source'})
+
+    cm2 = {col.strip().lower(): col for col in df.columns}
+    keep_cols = [cm2[c.lower()] for c in REQUIRED_COLUMNS if c.lower() in cm2]
+    df = df[keep_cols].copy()
+
+    cm3 = {col.strip().lower(): col for col in df.columns}
+    created_by_col = cm3.get('created by')
+    if created_by_col:
+        df['Source'] = df[created_by_col].apply(classify_source)
+
+    return df
+
+def render_inline_copy_button(text: str, button_text: str = "Copy"):
+    if not text:
+        return
+
+    btn_id = f"copy_btn_{uuid.uuid4().hex}"
+    text_id = f"copy_text_{uuid.uuid4().hex}"
+
+    safe_text = html.escape(text)
+    safe_button_text = html.escape(button_text)
+
+    components.html(
+        f"""
+        <div style="display:flex; justify-content:flex-end; margin-top:0.25rem; margin-bottom:0.25rem;">
+            <textarea id="{text_id}" readonly style="position:absolute; left:-9999px; top:-9999px;">{safe_text}</textarea>
+            <button
+                id="{btn_id}"
+                onclick="
+                    const btn = document.getElementById('{btn_id}');
+                    const textarea = document.getElementById('{text_id}');
+                    const originalText = btn.innerText;
+
+                    const showCopied = () => {{
+                        btn.innerText = 'Copied ✓';
+                        btn.style.background = '#d1fae5';
+                        btn.style.border = '1px solid #10b981';
+                        setTimeout(() => {{
+                            btn.innerText = originalText;
+                            btn.style.background = '#f0f2f6';
+                            btn.style.border = '1px solid #999';
+                        }}, 1500);
+                    }};
+
+                    const showFailed = () => {{
+                        btn.innerText = 'Copy failed';
+                        btn.style.background = '#fee2e2';
+                        btn.style.border = '1px solid #ef4444';
+                        setTimeout(() => {{
+                            btn.innerText = originalText;
+                            btn.style.background = '#f0f2f6';
+                            btn.style.border = '1px solid #999';
+                        }}, 1500);
+                    }};
+
+                    const copyWithFallback = () => {{
+                        textarea.focus();
+                        textarea.select();
+                        try {{
+                            const ok = document.execCommand('copy');
+                            if (ok) {{
+                                showCopied();
+                            }} else {{
+                                showFailed();
+                            }}
+                        }} catch (e) {{
+                            showFailed();
+                        }}
+                    }};
+
+                    if (navigator.clipboard && window.isSecureContext) {{
+                        navigator.clipboard.writeText(textarea.value)
+                            .then(() => showCopied())
+                            .catch(() => copyWithFallback());
+                    }} else {{
+                        copyWithFallback();
+                    }}
+                "
+                style="
+                    padding: 0.35rem 0.75rem;
+                    border-radius: 0.5rem;
+                    border: 1px solid #999;
+                    cursor: pointer;
+                    background: #f0f2f6;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    white-space: nowrap;
+                "
+            >
+                {safe_button_text}
+            </button>
+        </div>
+        """,
+        height=45,
+    )
+
+def render_table_with_copy(title: str, df: pd.DataFrame, copy_text: str, button_text: str):
+    left, right = st.columns([6, 1])
+
+    with left:
+        st.subheader(title)
+
+    with right:
+        if df is not None and not df.empty and copy_text:
+            render_inline_copy_button(copy_text, button_text=button_text)
+
+    st.dataframe(reset_index_display(df), use_container_width=True)
+
+def render_portal_link(url: str):
+    safe_url = html.escape(url, quote=True)
+    components.html(
+        f"""
+        <div style="display:flex; justify-content:center; margin: 0.35rem 0 0.9rem 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <a
+                href="{safe_url}"
+                target="_blank"
+                style="
+                    display:inline-block;
+                    text-decoration:none;
+                    padding: 0.55rem 1rem;
+                    border-radius: 0.6rem;
+                    border: 1px solid #3b82f6;
+                    background: rgba(59,130,246,0.14);
+                    color: #1d4ed8;
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    text-align:center;
+                "
+            >
+                Open Unified Portal
+            </a>
+        </div>
+        """,
+        height=60,
+    )
+
+def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: str = "Copy Batch", box_height: int = 260):
+    if not text:
+        return
+
+    btn_id = f"portal_copy_btn_{uuid.uuid4().hex}"
+    text_id = f"portal_copy_text_{uuid.uuid4().hex}"
+    safe_label = html.escape(label)
+    safe_subtitle = html.escape(subtitle)
+    safe_text = html.escape(text)
+    safe_button_text = html.escape(button_text)
+
+    components.html(
+        f"""
+        <div style="margin-bottom: 0.75rem; max-width: 220px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <div
+                style="
+                    width: 100%;
+                    background: #1f2937;
+                    border-radius: 0.7rem;
+                    padding: 0.9rem 1rem 1rem 1rem;
+                    box-sizing: border-box;
+                "
+            >
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; gap:0.5rem;">
+                    <div>
+                        <div style="font-weight:700; font-size:1rem; color:#f9fafb; margin-bottom:0.18rem;">{safe_label}</div>
+                        <div style="font-size:0.95rem; color:#d1d5db;">{safe_subtitle}</div>
+                    </div>
+
+                    <div style="flex-shrink:0;">
+                        <textarea id="{text_id}" readonly style="position:absolute; left:-9999px; top:-9999px;">{safe_text}</textarea>
+                        <button
+                            id="{btn_id}"
+                            onclick="
+                                const btn = document.getElementById('{btn_id}');
+                                const textarea = document.getElementById('{text_id}');
+                                const originalText = btn.innerText;
+
+                                const showCopied = () => {{
+                                    btn.innerText = 'Copied ✓';
+                                    btn.style.background = '#d1fae5';
+                                    btn.style.border = '1px solid #10b981';
+                                    setTimeout(() => {{
+                                        btn.innerText = originalText;
+                                        btn.style.background = '#f0f2f6';
+                                        btn.style.border = '1px solid #999';
+                                    }}, 1500);
+                                }};
+
+                                const showFailed = () => {{
+                                    btn.innerText = 'Copy failed';
+                                    btn.style.background = '#fee2e2';
+                                    btn.style.border = '1px solid #ef4444';
+                                    setTimeout(() => {{
+                                        btn.innerText = originalText;
+                                        btn.style.background = '#f0f2f6';
+                                        btn.style.border = '1px solid #999';
+                                    }}, 1500);
+                                }};
+
+                                const copyWithFallback = () => {{
+                                    textarea.focus();
+                                    textarea.select();
+                                    try {{
+                                        const ok = document.execCommand('copy');
+                                        if (ok) {{
+                                            showCopied();
+                                        }} else {{
+                                            showFailed();
+                                        }}
+                                    }} catch (e) {{
+                                        showFailed();
+                                    }}
+                                }};
+
+                                if (navigator.clipboard && window.isSecureContext) {{
+                                    navigator.clipboard.writeText(textarea.value)
+                                        .then(() => showCopied())
+                                        .catch(() => copyWithFallback());
+                                }} else {{
+                                    copyWithFallback();
+                                }}
+                            "
+                            style="
+                                padding: 0.3rem 0.65rem;
+                                border-radius: 0.5rem;
+                                border: 1px solid #999;
+                                cursor: pointer;
+                                background: #f0f2f6;
+                                font-size: 0.85rem;
+                                font-weight: 500;
+                                white-space: nowrap;
+                                color: #111827;
+                            "
+                        >
+                            {safe_button_text}
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    style="
+                        width: 100%;
+                        height: {box_height}px;
+                        overflow-y: auto;
+                        overflow-x: hidden;
+                        background: rgba(255,255,255,0.04);
+                        border-radius: 0.6rem;
+                        padding: 0.95rem 1rem;
+                        box-sizing: border-box;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+                        font-size: 0.98rem;
+                        line-height: 1.55;
+                        white-space: pre;
+                        color: #f9fafb;
+                    "
+                >{safe_text}</div>
+            </div>
+        </div>
+        """,
+        height=box_height + 120,
+    )
 
 def _norm_col(s: str) -> str:
     return re.sub(r'[\s_\-]+', '', str(s).strip().lower())
@@ -260,7 +561,7 @@ def extract_arrival_scheduled_ids_from_unified_portal_csv(df: pd.DataFrame):
     ids = s_search[mask].dropna().astype(str).str.strip().tolist()
     return list(dict.fromkeys([x for x in ids if x]))
 
-def render_wrapped_batches(batch_texts, per_row=3):
+def render_wrapped_batches(batch_texts, per_row=6, box_height=260):
     if not batch_texts:
         return
     per_row = max(1, int(per_row))
@@ -273,8 +574,13 @@ def render_wrapped_batches(batch_texts, per_row=3):
                 break
             b = batch_texts[idx]
             with cols[c]:
-                st.markdown(f"**{b['label']}**  \n{b['subtitle']}")
-                st.code(b["text"], language=None)
+                render_portal_batch_card(
+                    label=b["label"],
+                    subtitle=b["subtitle"],
+                    text=b["text"],
+                    button_text="Copy Batch",
+                    box_height=box_height
+                )
             idx += 1
 
 def run_cross_reference():
@@ -282,7 +588,7 @@ def run_cross_reference():
     cm = {col.strip().lower(): col for col in ds5.columns}
     oic = cm.get('order id')
     if not oic:
-        st.error("Missing 'Order ID' column for Step 4.")
+        st.error("Missing 'Order ID' column for Portal Check.")
         st.stop()
 
     portal_ids = st.session_state.portal_ids
@@ -312,10 +618,19 @@ def run_cross_reference():
 
 def go_back_one_step():
     cur = int(st.session_state.step or 1)
-    if cur == 4 and st.session_state.get("step3_skipped", False):
-        st.session_state.step = 2
+
+    if cur == 3:
+        st.session_state.step = 1
+    elif cur == 4 and st.session_state.get("step3_skipped", False):
+        st.session_state.step = 1
     else:
-        st.session_state.step = max(1, cur - 1)
+        if cur == 5:
+            st.session_state.step = 4
+        elif cur == 4:
+            st.session_state.step = 3
+        else:
+            st.session_state.step = 1
+
     st.rerun()
 
 def scroll_to_top():
@@ -360,17 +675,19 @@ st.title('Uncovered Orders Audit')
 st.caption('Amazon Freight Scheduling Team - Automated Audit Workflow')
 st.divider()
 
-step_labels = [
-    '1. Load File',
-    '2. Data Cleanup and Order Classification',
-    '3. External Orders',
-    '4. Portal Check',
-    '5. Final Results'
-]
-pv = (st.session_state.step - 1) / (len(step_labels) - 1)
-st.progress(pv, text='Step {} of {}: {}'.format(
-    st.session_state.step, len(step_labels), step_labels[st.session_state.step-1]
-))
+visible_step_count = len(VISIBLE_STEP_ORDER)
+current_visible_step_number = VISIBLE_STEP_NUMBER.get(st.session_state.step, 1)
+current_visible_step_label = VISIBLE_STEP_LABELS.get(st.session_state.step, VISIBLE_STEP_LABELS[1])
+pv = (current_visible_step_number - 1) / (visible_step_count - 1)
+
+st.progress(
+    pv,
+    text='Step {} of {}: {}'.format(
+        current_visible_step_number,
+        visible_step_count,
+        current_visible_step_label.split('. ', 1)[1]
+    )
+)
 st.divider()
 
 if st.session_state.step == 1:
@@ -391,86 +708,16 @@ if st.session_state.step == 1:
             st.dataframe(df.head(10), use_container_width=True)
             st.caption('Showing first 10 of {} rows.'.format(len(df)))
 
-            if st.button('Proceed to Step 2 - Data Cleanup and Order Classification', type='primary'):
-                st.session_state.step = 2
+            if st.button('Proceed to Step 2 - External Orders', type='primary'):
+                st.session_state.df_formatted = process_step2_backend(df)
+                st.session_state.step = 3
                 st.rerun()
 
         except Exception as e:
             st.error('Error reading file: {}. Please check the file and try again.'.format(e))
 
-elif st.session_state.step == 2:
-    st.header('Step 2 - Data Cleanup and Order Classification')
-    st.info(
-        "This step performs all of the following in one go:\n"
-        "- Remove Test orders (Shipper contains 'Test')\n"
-        "- Remove any row containing a cell with value 'Dummy' (case-insensitive)\n"
-        "- Rename Column B to 'Source'\n"
-        "- Keep only the required 7 columns\n"
-        "- Classify each order as SMC or R4S (based on 'Created by')"
-    )
-
-    df = st.session_state.df_raw.copy()
-    initial_count = len(df)
-
-    cm = {col.strip().lower(): col for col in df.columns}
-
-    df_str = df.astype(str)
-    dummy_mask = df_str.apply(lambda col: col.str.strip().str.lower().eq('dummy'), axis=0).any(axis=1)
-
-    shipper_col = cm.get('shipper')
-    if shipper_col:
-        test_mask = df[shipper_col].astype(str).str.contains('test', case=False, na=False)
-    else:
-        test_mask = pd.Series([False] * len(df), index=df.index)
-
-    remove_mask = dummy_mask | test_mask
-    removed = int(remove_mask.sum())
-    df = df.loc[~remove_mask].copy()
-
-    st.markdown(f"- Removed **{removed}** row(s) (Test/Dummy).")
-    st.markdown(f"- Remaining: **{len(df)}** (from {initial_count}).")
-
-    cols = list(df.columns)
-    if len(cols) >= 2:
-        old_b = cols[1]
-        df = df.rename(columns={old_b: 'Source'})
-        st.markdown(f"- Renamed column **{old_b}** to **Source**.")
-
-    cm2 = {col.strip().lower(): col for col in df.columns}
-    missing = [c for c in REQUIRED_COLUMNS if c.lower() not in cm2]
-    if missing:
-        st.warning(f"Missing required columns: {missing}")
-
-    keep_cols = [cm2[c.lower()] for c in REQUIRED_COLUMNS if c.lower() in cm2]
-    df = df[keep_cols].copy()
-
-    cm3 = {col.strip().lower(): col for col in df.columns}
-    created_by_col = cm3.get('created by')
-    if created_by_col:
-        df['Source'] = df[created_by_col].apply(classify_source)
-        smc_count = int((df['Source'] == 'SMC').sum())
-        r4s_count = int((df['Source'] == 'R4S').sum())
-        x1, x2, x3 = st.columns(3)
-        x1.metric('Total Orders', len(df))
-        x2.metric('SMC Orders', smc_count)
-        x3.metric('R4S Orders', r4s_count)
-
-    st.divider()
-    st.subheader("Preview (post-cleanup & classification)")
-    st.dataframe(reset_index_display(df), use_container_width=True)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button('Back a step'):
-            go_back_one_step()
-    with c2:
-        if st.button('Proceed to Step 3 - External Orders', type='primary'):
-            st.session_state.df_formatted = df
-            st.session_state.step = 3
-            st.rerun()
-
 elif st.session_state.step == 3:
-    st.header('Step 3 - Process External Orders')
+    st.header('Step 2 - Process External Orders')
 
     df = st.session_state.df_formatted.copy()
     cm = {col.strip().lower(): col for col in df.columns}
@@ -512,29 +759,21 @@ elif st.session_state.step == 3:
     c2.metric('Non-CST External Orders', len(non_cst_ext))
 
     st.divider()
-    st.subheader('CST External Orders - copy to CST Task Sheet (Uncovered tab)')
-    st.dataframe(reset_index_display(cst_ext), use_container_width=True)
+    cst_ext_copy = make_copy_block(cst_ext, exclude_cols=['Created by'])
+    render_table_with_copy(
+        title='CST External Orders - copy to CST Task Sheet (Uncovered tab)',
+        df=cst_ext,
+        copy_text=cst_ext_copy,
+        button_text='Copy to CST Sheet'
+    )
 
-    st.subheader('Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)')
-    st.dataframe(reset_index_display(non_cst_ext), use_container_width=True)
-
-    st.divider()
-    st.subheader("Copy-ready blocks (one-click copy via copy icon)")
-    cc1, cc2 = st.columns(2)
-    with cc1:
-        if st.button("Generate copy block: CST External Orders", key="copy_cst_ext"):
-            st.session_state['_copy_block_cst_ext'] = make_copy_block(cst_ext, exclude_cols=['Created by'])
-        blk = st.session_state.get('_copy_block_cst_ext', "")
-        if blk:
-            st.caption("CST External copy block: click the copy icon (top-right of code box)")
-            st.code(blk, language=None)
-    with cc2:
-        if st.button("Generate copy block: Non-CST External Orders", key="copy_non_cst_ext"):
-            st.session_state['_copy_block_non_cst_ext'] = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
-        blk2 = st.session_state.get('_copy_block_non_cst_ext', "")
-        if blk2:
-            st.caption("Non-CST External copy block: click the copy icon (top-right of code box)")
-            st.code(blk2, language=None)
+    non_cst_ext_copy = make_copy_block(non_cst_ext, exclude_cols=['Created by'])
+    render_table_with_copy(
+        title='Non-CST External Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
+        df=non_cst_ext,
+        copy_text=non_cst_ext_copy,
+        button_text='Copy to Scheduling Sheet'
+    )
 
     st.divider()
     st.warning(
@@ -549,7 +788,7 @@ elif st.session_state.step == 3:
         if st.button('Back a step'):
             go_back_one_step()
     with c2:
-        if st.button('Done - Proceed to Step 4', type='primary'):
+        if st.button('Done - Proceed to Step 3', type='primary'):
             st.session_state.cst_ext = cst_ext
             st.session_state.non_cst_ext = non_cst_ext
             st.session_state.df_step4 = intr.drop(columns=['_is_fc'])
@@ -561,20 +800,22 @@ elif st.session_state.step == 3:
             st.rerun()
 
 elif st.session_state.step == 4:
-    st.header('Step 4 - Unified Portal ISA Check')
+    st.header('Step 3 - Unified Portal ISA Check')
 
     if st.session_state.step3_skipped:
-        st.info("Step 3 was skipped automatically because **External Orders = 0**. Proceeding directly with FC-bound orders portal check.")
+        st.info("External Orders = 0, so the tool skipped straight to Portal Check.")
 
     ds4 = st.session_state.df_step4
     cm = {col.strip().lower(): col for col in ds4.columns}
     oic = cm.get('order id')
     if not oic:
-        st.error("Missing 'Order ID' column for Step 4.")
+        st.error("Missing 'Order ID' column for Portal Check.")
         st.stop()
 
     rids = ds4[oic].dropna().astype(str).str.strip().tolist()
     st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
+
+    render_portal_link(UNIFIED_PORTAL_URL)
 
     batch_size = 50
     total = len(rids)
@@ -584,7 +825,7 @@ elif st.session_state.step == 4:
         if total == 0:
             st.warning("No Order IDs available to copy.")
         else:
-            st.caption("Batches are displayed in a wrapped grid. One-click copy each batch using the copy icon.")
+            st.caption("Batches are displayed in a wrapped grid. Use the copy button on each batch.")
 
             batches = []
             for i in range(batch_count):
@@ -599,23 +840,12 @@ elif st.session_state.step == 4:
                     "text": "\n".join(batch_ids),
                 })
 
-            render_wrapped_batches(batches, per_row=3)
-
-    st.divider()
-    st.subheader('Unified Portal Workflow (New)')
-    st.markdown(
-        "1. Copy Order IDs above into Unified Portal (in batches of 50).\n"
-        "2. Run the search in Unified Portal.\n"
-        "3. Export / Download the search results as **CSV**.\n"
-        "4. Upload **all CSV files** from each batch below.\n"
-        "5. The tool will automatically extract **Arrival Scheduled** IDs from `searchId`.\n"
-        "6. Once extracted, the **Run Cross-Reference** button will activate."
-    )
+            render_wrapped_batches(batches, per_row=6, box_height=260)
 
     st.divider()
     st.subheader('Upload Unified Portal Results CSV(s)')
 
-    if st.button("Reset Step 4 Inputs", key="reset_step4"):
+    if st.button("Reset Portal Inputs", key="reset_step4"):
         st.session_state.portal_ids = []
         st.session_state.arrival_ids_ready = False
         st.session_state.portal_export_filenames = []
@@ -743,7 +973,7 @@ elif st.session_state.step == 4:
         run_cross_reference()
 
 elif st.session_state.step == 5:
-    st.header('Audit Complete - Final Results')
+    st.header('Step 4 - Audit Complete')
     st.balloons()
 
     cf = st.session_state.cst_final if st.session_state.cst_final is not None else pd.DataFrame(columns=REQUIRED_COLUMNS_CST)
@@ -773,29 +1003,21 @@ elif st.session_state.step == 5:
     )
 
     st.divider()
-    st.subheader('CST Orders - copy to CST Task Sheet (Uncovered tab)')
-    st.dataframe(reset_index_display(cf_clean), use_container_width=True)
+    cf_copy = make_copy_block(cf_clean, exclude_cols=['Created by'])
+    render_table_with_copy(
+        title='CST Orders - copy to CST Task Sheet (Uncovered tab)',
+        df=cf_clean,
+        copy_text=cf_copy,
+        button_text='Copy to CST Sheet'
+    )
 
-    st.subheader('Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)')
-    st.dataframe(reset_index_display(ncf), use_container_width=True)
-
-    st.divider()
-    st.subheader("Copy-ready blocks (one-click copy via copy icon)")
-    cc1, cc2 = st.columns(2)
-    with cc1:
-        if st.button("Generate copy block: CST Final Orders", key="copy_cst_final"):
-            st.session_state['_copy_block_cst_final'] = make_copy_block(cf_clean, exclude_cols=['Created by'])
-        blk = st.session_state.get('_copy_block_cst_final', "")
-        if blk:
-            st.caption("CST Final copy block: click the copy icon (top-right of code box)")
-            st.code(blk, language=None)
-    with cc2:
-        if st.button("Generate copy block: Scheduling Final Orders", key="copy_non_cst_final"):
-            st.session_state['_copy_block_non_cst_final'] = make_copy_block(ncf, exclude_cols=['Created by'])
-        blk2 = st.session_state.get('_copy_block_non_cst_final', "")
-        if blk2:
-            st.caption("Non-CST Final copy block: click the copy icon (top-right of code box)")
-            st.code(blk2, language=None)
+    ncf_copy = make_copy_block(ncf, exclude_cols=['Created by'])
+    render_table_with_copy(
+        title='Non-CST Orders - copy to AF Scheduling Daily Task Workbook (Uncovered tab)',
+        df=ncf,
+        copy_text=ncf_copy,
+        button_text='Copy to Scheduling Sheet'
+    )
 
     st.divider()
     st.warning(
@@ -812,8 +1034,6 @@ elif st.session_state.step == 5:
             'smc_upload',
             'portal_export_upload_multi',
             'manual_arrivals_paste',
-            '_copy_block_cst_ext', '_copy_block_non_cst_ext',
-            '_copy_block_cst_final', '_copy_block_non_cst_final',
         ]
         for k in keys_to_clear:
             if k in st.session_state:
