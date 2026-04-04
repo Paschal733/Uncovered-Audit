@@ -390,6 +390,34 @@ def render_table_with_copy(title: str, df: pd.DataFrame, copy_text: str, button_
 
     st.dataframe(reset_index_display(df), use_container_width=True)
 
+def render_portal_link(url: str):
+    safe_url = html.escape(url, quote=True)
+    components.html(
+        f"""
+        <div style="display:flex; justify-content:center; margin: 0.35rem 0 0.9rem 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <a
+                href="{safe_url}"
+                target="_blank"
+                style="
+                    display:inline-block;
+                    text-decoration:none;
+                    padding: 0.55rem 1rem;
+                    border-radius: 0.6rem;
+                    border: 1px solid #3b82f6;
+                    background: rgba(59,130,246,0.14);
+                    color: #dbeafe;
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    text-align:center;
+                "
+            >
+                Open Unified Portal
+            </a>
+        </div>
+        """,
+        height=60,
+    )
+
 def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: str = "Copy Batch", box_height: int = 260):
     if not text:
         return
@@ -404,103 +432,113 @@ def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: 
     components.html(
         f"""
         <div style="margin-bottom: 0.75rem; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.45rem; gap:0.5rem;">
-                <div>
-                    <div style="font-weight:700; font-size:1rem; color:#f9fafb; margin-bottom:0.18rem;">{safe_label}</div>
-                    <div style="font-size:0.95rem; color:#d1d5db;">{safe_subtitle}</div>
-                </div>
-
-                <div style="flex-shrink:0;">
-                    <textarea id="{text_id}" readonly style="position:absolute; left:-9999px; top:-9999px;">{safe_text}</textarea>
-                    <button
-                        id="{btn_id}"
-                        onclick="
-                            const btn = document.getElementById('{btn_id}');
-                            const textarea = document.getElementById('{text_id}');
-                            const originalText = btn.innerText;
-
-                            const showCopied = () => {{
-                                btn.innerText = 'Copied ✓';
-                                btn.style.background = '#d1fae5';
-                                btn.style.border = '1px solid #10b981';
-                                setTimeout(() => {{
-                                    btn.innerText = originalText;
-                                    btn.style.background = '#f0f2f6';
-                                    btn.style.border = '1px solid #999';
-                                }}, 1500);
-                            }};
-
-                            const showFailed = () => {{
-                                btn.innerText = 'Copy failed';
-                                btn.style.background = '#fee2e2';
-                                btn.style.border = '1px solid #ef4444';
-                                setTimeout(() => {{
-                                    btn.innerText = originalText;
-                                    btn.style.background = '#f0f2f6';
-                                    btn.style.border = '1px solid #999';
-                                }}, 1500);
-                            }};
-
-                            const copyWithFallback = () => {{
-                                textarea.focus();
-                                textarea.select();
-                                try {{
-                                    const ok = document.execCommand('copy');
-                                    if (ok) {{
-                                        showCopied();
-                                    }} else {{
-                                        showFailed();
-                                    }}
-                                }} catch (e) {{
-                                    showFailed();
-                                }}
-                            }};
-
-                            if (navigator.clipboard && window.isSecureContext) {{
-                                navigator.clipboard.writeText(textarea.value)
-                                    .then(() => showCopied())
-                                    .catch(() => copyWithFallback());
-                            }} else {{
-                                copyWithFallback();
-                            }}
-                        "
-                        style="
-                            padding: 0.3rem 0.65rem;
-                            border-radius: 0.5rem;
-                            border: 1px solid #999;
-                            cursor: pointer;
-                            background: #f0f2f6;
-                            font-size: 0.85rem;
-                            font-weight: 500;
-                            white-space: nowrap;
-                            color: #111827;
-                        "
-                    >
-                        {safe_button_text}
-                    </button>
-                </div>
-            </div>
-
             <div
                 style="
                     width: 100%;
-                    height: {box_height}px;
-                    overflow-y: auto;
-                    overflow-x: hidden;
                     background: #1f2937;
                     border-radius: 0.7rem;
-                    padding: 1rem 1rem 0.95rem 1rem;
+                    padding: 0.9rem 1rem 1rem 1rem;
                     box-sizing: border-box;
-                    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-                    font-size: 0.98rem;
-                    line-height: 1.55;
-                    white-space: pre;
-                    color: #f9fafb;
                 "
-            >{safe_text}</div>
+            >
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; gap:0.5rem;">
+                    <div>
+                        <div style="font-weight:700; font-size:1rem; color:#f9fafb; margin-bottom:0.18rem;">{safe_label}</div>
+                        <div style="font-size:0.95rem; color:#d1d5db;">{safe_subtitle}</div>
+                    </div>
+
+                    <div style="flex-shrink:0;">
+                        <textarea id="{text_id}" readonly style="position:absolute; left:-9999px; top:-9999px;">{safe_text}</textarea>
+                        <button
+                            id="{btn_id}"
+                            onclick="
+                                const btn = document.getElementById('{btn_id}');
+                                const textarea = document.getElementById('{text_id}');
+                                const originalText = btn.innerText;
+
+                                const showCopied = () => {{
+                                    btn.innerText = 'Copied ✓';
+                                    btn.style.background = '#d1fae5';
+                                    btn.style.border = '1px solid #10b981';
+                                    setTimeout(() => {{
+                                        btn.innerText = originalText;
+                                        btn.style.background = '#f0f2f6';
+                                        btn.style.border = '1px solid #999';
+                                    }}, 1500);
+                                }};
+
+                                const showFailed = () => {{
+                                    btn.innerText = 'Copy failed';
+                                    btn.style.background = '#fee2e2';
+                                    btn.style.border = '1px solid #ef4444';
+                                    setTimeout(() => {{
+                                        btn.innerText = originalText;
+                                        btn.style.background = '#f0f2f6';
+                                        btn.style.border = '1px solid #999';
+                                    }}, 1500);
+                                }};
+
+                                const copyWithFallback = () => {{
+                                    textarea.focus();
+                                    textarea.select();
+                                    try {{
+                                        const ok = document.execCommand('copy');
+                                        if (ok) {{
+                                            showCopied();
+                                        }} else {{
+                                            showFailed();
+                                        }}
+                                    }} catch (e) {{
+                                        showFailed();
+                                    }}
+                                }};
+
+                                if (navigator.clipboard && window.isSecureContext) {{
+                                    navigator.clipboard.writeText(textarea.value)
+                                        .then(() => showCopied())
+                                        .catch(() => copyWithFallback());
+                                }} else {{
+                                    copyWithFallback();
+                                }}
+                            "
+                            style="
+                                padding: 0.3rem 0.65rem;
+                                border-radius: 0.5rem;
+                                border: 1px solid #999;
+                                cursor: pointer;
+                                background: #f0f2f6;
+                                font-size: 0.85rem;
+                                font-weight: 500;
+                                white-space: nowrap;
+                                color: #111827;
+                            "
+                        >
+                            {safe_button_text}
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    style="
+                        width: 100%;
+                        height: {box_height}px;
+                        overflow-y: auto;
+                        overflow-x: hidden;
+                        background: rgba(255,255,255,0.04);
+                        border-radius: 0.6rem;
+                        padding: 0.95rem 1rem;
+                        box-sizing: border-box;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+                        font-size: 0.98rem;
+                        line-height: 1.55;
+                        white-space: pre;
+                        color: #f9fafb;
+                    "
+                >{safe_text}</div>
+            </div>
         </div>
         """,
-        height=box_height + 95,
+        height=box_height + 120,
     )
 
 def _norm_col(s: str) -> str:
@@ -777,9 +815,7 @@ elif st.session_state.step == 4:
     rids = ds4[oic].dropna().astype(str).str.strip().tolist()
     st.info('{} Order IDs need to be checked in the Unified Portal.'.format(len(rids)))
 
-    c1, c2, c3 = st.columns([2, 2, 2])
-    with c2:
-        st.link_button('Open Unified Portal', UNIFIED_PORTAL_URL, use_container_width=True)
+    render_portal_link(UNIFIED_PORTAL_URL)
 
     batch_size = 50
     total = len(rids)
