@@ -405,7 +405,7 @@ def render_portal_link(url: str):
                     border-radius: 0.6rem;
                     border: 1px solid #3b82f6;
                     background: rgba(59,130,246,0.14);
-                    color: #dbeafe;
+                    color: #1d4ed8;
                     font-weight: 600;
                     font-size: 0.95rem;
                     text-align:center;
@@ -431,7 +431,7 @@ def render_portal_batch_card(label: str, subtitle: str, text: str, button_text: 
 
     components.html(
         f"""
-        <div style="margin-bottom: 0.75rem; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="margin-bottom: 0.75rem; max-width: 220px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
             <div
                 style="
                     width: 100%;
@@ -561,7 +561,7 @@ def extract_arrival_scheduled_ids_from_unified_portal_csv(df: pd.DataFrame):
     ids = s_search[mask].dropna().astype(str).str.strip().tolist()
     return list(dict.fromkeys([x for x in ids if x]))
 
-def render_wrapped_batches(batch_texts, per_row=3, box_height=260):
+def render_wrapped_batches(batch_texts, per_row=6, box_height=260):
     if not batch_texts:
         return
     per_row = max(1, int(per_row))
@@ -840,7 +840,7 @@ elif st.session_state.step == 4:
                     "text": "\n".join(batch_ids),
                 })
 
-            render_wrapped_batches(batches, per_row=3, box_height=260)
+            render_wrapped_batches(batches, per_row=6, box_height=260)
 
     st.divider()
     st.subheader('Upload Unified Portal Results CSV(s)')
