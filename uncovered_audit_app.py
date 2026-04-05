@@ -859,27 +859,21 @@ def inject_uncovered_lightmode_background():
         @media (prefers-color-scheme: light) {
             .stApp {
                 background:
-                    linear-gradient(rgba(248, 244, 235, 0.92), rgba(244, 239, 229, 0.92)),
-                    linear-gradient(90deg, rgba(255,255,255,0.12) 0, rgba(255,255,255,0.12) 1px, transparent 1px, transparent 24px),
-                    linear-gradient(0deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 24px),
-                    linear-gradient(90deg, rgba(160,150,135,0.035) 0%, rgba(255,255,255,0.00) 18%, rgba(160,150,135,0.035) 36%, rgba(255,255,255,0.00) 54%, rgba(160,150,135,0.03) 72%, rgba(255,255,255,0.00) 100%),
-                    linear-gradient(0deg, rgba(160,150,135,0.028) 0%, rgba(255,255,255,0.00) 22%, rgba(160,150,135,0.028) 44%, rgba(255,255,255,0.00) 66%, rgba(160,150,135,0.022) 88%, rgba(255,255,255,0.00) 100%),
-                    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.16), transparent 22%),
-                    radial-gradient(circle at 80% 30%, rgba(0,0,0,0.02), transparent 26%),
-                    linear-gradient(180deg, #f5f0e7 0%, #efe9de 100%) !important;
+                    radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
+                    radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
+                    radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
+                    linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
+                    linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
                 color: #1f2937 !important;
             }
 
             [data-testid="stAppViewContainer"] {
                 background:
-                    linear-gradient(rgba(248, 244, 235, 0.92), rgba(244, 239, 229, 0.92)),
-                    linear-gradient(90deg, rgba(255,255,255,0.12) 0, rgba(255,255,255,0.12) 1px, transparent 1px, transparent 24px),
-                    linear-gradient(0deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 24px),
-                    linear-gradient(90deg, rgba(160,150,135,0.035) 0%, rgba(255,255,255,0.00) 18%, rgba(160,150,135,0.035) 36%, rgba(255,255,255,0.00) 54%, rgba(160,150,135,0.03) 72%, rgba(255,255,255,0.00) 100%),
-                    linear-gradient(0deg, rgba(160,150,135,0.028) 0%, rgba(255,255,255,0.00) 22%, rgba(160,150,135,0.028) 44%, rgba(255,255,255,0.00) 66%, rgba(160,150,135,0.022) 88%, rgba(255,255,255,0.00) 100%),
-                    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.16), transparent 22%),
-                    radial-gradient(circle at 80% 30%, rgba(0,0,0,0.02), transparent 26%),
-                    linear-gradient(180deg, #f5f0e7 0%, #efe9de 100%) !important;
+                    radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
+                    radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
+                    radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
+                    linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
+                    linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
             }
 
             [data-testid="stHeader"],
