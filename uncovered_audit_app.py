@@ -925,40 +925,6 @@ def inject_uncovered_lightmode_background():
         height=0,
     )
 
-    components.html(
-        """
-        <script>
-        const doc = window.parent.document;
-
-        function applyThemeClass() {
-            const body = doc.body;
-            const app = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
-            const style = window.parent.getComputedStyle(app);
-            const bg = style.backgroundColor || "rgb(255,255,255)";
-
-            const match = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
-            if (!match) return;
-
-            const r = parseInt(match[1], 10);
-            const g = parseInt(match[2], 10);
-            const b = parseInt(match[3], 10);
-
-            const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-
-            body.classList.remove("uncovered-light-mode");
-
-            if (luminance > 170) {
-                body.classList.add("uncovered-light-mode");
-            }
-        }
-
-        applyThemeClass();
-        new MutationObserver(applyThemeClass).observe(doc.body, { attributes: true, childList: true, subtree: true });
-        </script>
-        """,
-        height=0,
-    )
-
 def render_home_card(icon: str, title: str, status: str, key: str, active: bool):
     pill_class = "audit-pill-live" if status == "LIVE" else "audit-pill-dev"
 
