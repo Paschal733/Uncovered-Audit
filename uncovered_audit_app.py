@@ -856,30 +856,25 @@ def inject_uncovered_lightmode_background():
     st.markdown(
         """
         <style>
-        .stApp {
+        .uncovered-light-mode .stApp,
+        .uncovered-light-mode [data-testid="stAppViewContainer"] {
             background:
-                radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
-                radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
-                radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
-                linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
-                linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
+                linear-gradient(rgba(240, 232, 219, 0.78), rgba(233, 224, 209, 0.78)),
+                linear-gradient(90deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 18px),
+                linear-gradient(0deg, rgba(255,255,255,0.06) 0, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 18px),
+                linear-gradient(90deg, rgba(120,104,82,0.040) 0%, transparent 16%, rgba(120,104,82,0.032) 32%, transparent 48%, rgba(120,104,82,0.036) 64%, transparent 80%, rgba(120,104,82,0.028) 100%),
+                linear-gradient(0deg, rgba(120,104,82,0.032) 0%, transparent 18%, rgba(120,104,82,0.026) 36%, transparent 54%, rgba(120,104,82,0.030) 72%, transparent 90%, rgba(120,104,82,0.020) 100%),
+                radial-gradient(circle at top left, rgba(156, 167, 181, 0.20) 0%, transparent 24%),
+                radial-gradient(circle at top right, rgba(168, 148, 123, 0.18) 0%, transparent 26%),
+                radial-gradient(circle at bottom left, rgba(182, 169, 149, 0.14) 0%, transparent 24%),
+                linear-gradient(180deg, #ede4d6 0%, #e5dbc9 52%, #ddd1bd 100%) !important;
             color: #1f2937 !important;
             min-height: 100vh;
         }
 
-        [data-testid="stAppViewContainer"] {
-            background:
-                radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
-                radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
-                radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
-                linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
-                linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
-            min-height: 100vh;
-        }
-
-        [data-testid="stHeader"],
-        [data-testid="stToolbar"],
-        header[data-testid="stHeader"] {
+        .uncovered-light-mode [data-testid="stHeader"],
+        .uncovered-light-mode [data-testid="stToolbar"],
+        .uncovered-light-mode header[data-testid="stHeader"] {
             background: transparent !important;
         }
         </style>
@@ -887,6 +882,39 @@ def inject_uncovered_lightmode_background():
         unsafe_allow_html=True,
     )
 
+    components.html(
+        """
+        <script>
+        const doc = window.parent.document;
+
+        function applyThemeClass() {
+            const body = doc.body;
+            const app = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
+            const style = window.parent.getComputedStyle(app);
+            const bg = style.backgroundColor || "rgb(255,255,255)";
+
+            const match = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+            if (!match) return;
+
+            const r = parseInt(match[1], 10);
+            const g = parseInt(match[2], 10);
+            const b = parseInt(match[3], 10);
+
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+
+            body.classList.remove("uncovered-light-mode");
+
+            if (luminance > 170) {
+                body.classList.add("uncovered-light-mode");
+            }
+        }
+
+        applyThemeClass();
+        new MutationObserver(applyThemeClass).observe(doc.body, { attributes: true, childList: true, subtree: true });
+        </script>
+        """,
+        height=0,
+    )
 
 def render_home_card(icon: str, title: str, status: str, key: str, active: bool):
     pill_class = "audit-pill-live" if status == "LIVE" else "audit-pill-dev"
