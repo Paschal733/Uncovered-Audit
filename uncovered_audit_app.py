@@ -851,6 +851,7 @@ def inject_home_page_styles():
         unsafe_allow_html=True,
     )
 
+
 def render_home_card(icon: str, title: str, status: str, key: str, active: bool):
     pill_class = "audit-pill-live" if status == "LIVE" else "audit-pill-dev"
 
@@ -906,8 +907,6 @@ def render_audit_hub_home():
 
 
 def render_uncovered_audit():
-    inject_uncovered_lightmode_background()
-
     defaults = {
         'step': 1,
         'df_raw': None,
