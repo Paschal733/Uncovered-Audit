@@ -856,31 +856,31 @@ def inject_uncovered_lightmode_background():
     st.markdown(
         """
         <style>
-        @media (prefers-color-scheme: light) {
-            .stApp {
-                background:
-                    radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
-                    radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
-                    radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
-                    linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
-                    linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
-                color: #1f2937 !important;
-            }
+        .stApp {
+            background:
+                radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
+                radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
+                radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
+                linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
+                linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
+            color: #1f2937 !important;
+            min-height: 100vh;
+        }
 
-            [data-testid="stAppViewContainer"] {
-                background:
-                    radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
-                    radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
-                    radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
-                    linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
-                    linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
-            }
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at top left, rgba(186, 200, 214, 0.28) 0%, transparent 24%),
+                radial-gradient(circle at top right, rgba(221, 210, 194, 0.22) 0%, transparent 26%),
+                radial-gradient(circle at bottom left, rgba(203, 214, 224, 0.16) 0%, transparent 24%),
+                linear-gradient(135deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.00) 38%),
+                linear-gradient(180deg, #faf7f2 0%, #f3eee6 52%, #eee8df 100%) !important;
+            min-height: 100vh;
+        }
 
-            [data-testid="stHeader"],
-            [data-testid="stToolbar"],
-            header[data-testid="stHeader"] {
-                background: transparent !important;
-            }
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        header[data-testid="stHeader"] {
+            background: transparent !important;
         }
         </style>
         """,
