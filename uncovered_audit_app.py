@@ -859,15 +859,24 @@ def inject_uncovered_lightmode_background():
         .uncovered-light-mode .stApp,
         .uncovered-light-mode [data-testid="stAppViewContainer"] {
             background:
-                linear-gradient(rgba(240, 232, 219, 0.78), rgba(233, 224, 209, 0.78)),
-                linear-gradient(90deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 18px),
-                linear-gradient(0deg, rgba(255,255,255,0.06) 0, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 18px),
-                linear-gradient(90deg, rgba(120,104,82,0.040) 0%, transparent 16%, rgba(120,104,82,0.032) 32%, transparent 48%, rgba(120,104,82,0.036) 64%, transparent 80%, rgba(120,104,82,0.028) 100%),
-                linear-gradient(0deg, rgba(120,104,82,0.032) 0%, transparent 18%, rgba(120,104,82,0.026) 36%, transparent 54%, rgba(120,104,82,0.030) 72%, transparent 90%, rgba(120,104,82,0.020) 100%),
-                radial-gradient(circle at top left, rgba(156, 167, 181, 0.20) 0%, transparent 24%),
-                radial-gradient(circle at top right, rgba(168, 148, 123, 0.18) 0%, transparent 26%),
-                radial-gradient(circle at bottom left, rgba(182, 169, 149, 0.14) 0%, transparent 24%),
-                linear-gradient(180deg, #ede4d6 0%, #e5dbc9 52%, #ddd1bd 100%) !important;
+                linear-gradient(rgba(225, 220, 212, 0.88), rgba(214, 208, 198, 0.88)),
+                
+                /* subtle grid texture (more visible now) */
+                linear-gradient(90deg, rgba(255,255,255,0.10) 0, rgba(255,255,255,0.10) 1px, transparent 1px, transparent 16px),
+                linear-gradient(0deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 16px),
+
+                /* grain-like texture (more defined) */
+                linear-gradient(90deg, rgba(90,80,65,0.055) 0%, transparent 18%, rgba(90,80,65,0.045) 36%, transparent 54%, rgba(90,80,65,0.050) 72%, transparent 90%, rgba(90,80,65,0.040) 100%),
+                linear-gradient(0deg, rgba(90,80,65,0.045) 0%, transparent 20%, rgba(90,80,65,0.040) 40%, transparent 60%, rgba(90,80,65,0.045) 80%, transparent 100%),
+
+                /* depth shadows */
+                radial-gradient(circle at top left, rgba(120, 135, 150, 0.28) 0%, transparent 28%),
+                radial-gradient(circle at top right, rgba(140, 130, 115, 0.22) 0%, transparent 30%),
+                radial-gradient(circle at bottom left, rgba(120, 115, 105, 0.18) 0%, transparent 28%),
+
+                /* base ash gradient */
+                linear-gradient(180deg, #dcd6cc 0%, #d1cbc0 52%, #c6bfb4 100%) !important;
+
             color: #1f2937 !important;
             min-height: 100vh;
         }
@@ -880,6 +889,40 @@ def inject_uncovered_lightmode_background():
         </style>
         """,
         unsafe_allow_html=True,
+    )
+
+    components.html(
+        """
+        <script>
+        const doc = window.parent.document;
+
+        function applyThemeClass() {
+            const body = doc.body;
+            const app = doc.querySelector('[data-testid="stAppViewContainer"]') || doc.body;
+            const style = window.parent.getComputedStyle(app);
+            const bg = style.backgroundColor || "rgb(255,255,255)";
+
+            const match = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+            if (!match) return;
+
+            const r = parseInt(match[1], 10);
+            const g = parseInt(match[2], 10);
+            const b = parseInt(match[3], 10);
+
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+
+            body.classList.remove("uncovered-light-mode");
+
+            if (luminance > 170) {
+                body.classList.add("uncovered-light-mode");
+            }
+        }
+
+        applyThemeClass();
+        new MutationObserver(applyThemeClass).observe(doc.body, { attributes: true, childList: true, subtree: true });
+        </script>
+        """,
+        height=0,
     )
 
     components.html(
