@@ -852,6 +852,48 @@ def inject_home_page_styles():
     )
 
 
+def inject_uncovered_lightmode_background():
+    st.markdown(
+        """
+        <style>
+        @media (prefers-color-scheme: light) {
+            .stApp {
+                background:
+                    linear-gradient(rgba(248, 244, 235, 0.92), rgba(244, 239, 229, 0.92)),
+                    linear-gradient(90deg, rgba(255,255,255,0.12) 0, rgba(255,255,255,0.12) 1px, transparent 1px, transparent 24px),
+                    linear-gradient(0deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 24px),
+                    linear-gradient(90deg, rgba(160,150,135,0.035) 0%, rgba(255,255,255,0.00) 18%, rgba(160,150,135,0.035) 36%, rgba(255,255,255,0.00) 54%, rgba(160,150,135,0.03) 72%, rgba(255,255,255,0.00) 100%),
+                    linear-gradient(0deg, rgba(160,150,135,0.028) 0%, rgba(255,255,255,0.00) 22%, rgba(160,150,135,0.028) 44%, rgba(255,255,255,0.00) 66%, rgba(160,150,135,0.022) 88%, rgba(255,255,255,0.00) 100%),
+                    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.16), transparent 22%),
+                    radial-gradient(circle at 80% 30%, rgba(0,0,0,0.02), transparent 26%),
+                    linear-gradient(180deg, #f5f0e7 0%, #efe9de 100%) !important;
+                color: #1f2937 !important;
+            }
+
+            [data-testid="stAppViewContainer"] {
+                background:
+                    linear-gradient(rgba(248, 244, 235, 0.92), rgba(244, 239, 229, 0.92)),
+                    linear-gradient(90deg, rgba(255,255,255,0.12) 0, rgba(255,255,255,0.12) 1px, transparent 1px, transparent 24px),
+                    linear-gradient(0deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 24px),
+                    linear-gradient(90deg, rgba(160,150,135,0.035) 0%, rgba(255,255,255,0.00) 18%, rgba(160,150,135,0.035) 36%, rgba(255,255,255,0.00) 54%, rgba(160,150,135,0.03) 72%, rgba(255,255,255,0.00) 100%),
+                    linear-gradient(0deg, rgba(160,150,135,0.028) 0%, rgba(255,255,255,0.00) 22%, rgba(160,150,135,0.028) 44%, rgba(255,255,255,0.00) 66%, rgba(160,150,135,0.022) 88%, rgba(255,255,255,0.00) 100%),
+                    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.16), transparent 22%),
+                    radial-gradient(circle at 80% 30%, rgba(0,0,0,0.02), transparent 26%),
+                    linear-gradient(180deg, #f5f0e7 0%, #efe9de 100%) !important;
+            }
+
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            header[data-testid="stHeader"] {
+                background: transparent !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_home_card(icon: str, title: str, status: str, key: str, active: bool):
     pill_class = "audit-pill-live" if status == "LIVE" else "audit-pill-dev"
 
@@ -907,6 +949,8 @@ def render_audit_hub_home():
 
 
 def render_uncovered_audit():
+    inject_uncovered_lightmode_background()
+
     defaults = {
         'step': 1,
         'df_raw': None,
